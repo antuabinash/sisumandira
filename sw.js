@@ -1,16 +1,20 @@
 // MODIFIED: New cache name
-const CACHE_NAME = 'student-data-cache-v3';
+const CACHE_NAME = 'student-data-cache-v4-firebase';
 
-// MODIFIED: Relative paths and added all files, including xlsx.js
+// MODIFIED: Added all Firebase SDKs
 const urlsToCache = [
   './',
   'index.html',
   'app.html',
+  // We don't cache admin.html, as it's for online use
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js' // NEW
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js'
 ];
 
 // Install the service worker and cache files
@@ -36,7 +40,6 @@ self.addEventListener('fetch', event => {
         }
         // Not in cache - fetch from network
         return fetch(event.request).catch(() => {
-            // Fallback for failed network requests
             console.log('Network request failed. Serving from cache (if available).');
         });
       }
@@ -52,7 +55,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            // Delete old caches (e.g., 'student-data-cache-v1', 'v2')
+            // Delete old caches
             return caches.delete(cacheName);
           }
         })
@@ -61,4 +64,3 @@ self.addEventListener('activate', event => {
     .then(() => self.clients.claim()) // Take control immediately
   );
 });
-
