@@ -8,6 +8,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <!-- NEW: Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js"></script>
+    
     <!-- Relative path -->
     <link rel="manifest" href="manifest.json">
 
@@ -24,14 +29,16 @@
         }
         h1 { color: #0056b3; }
         
-        #entryForm, #shareSection {
+        .card {
             max-width: 600px;
-            margin: 0 auto;
+            margin: 0 auto 20px auto;
             padding: 20px;
             background-color: #ffffff;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
+        
+        #entryForm { display: none; } /* Hide by default */
 
         div {
             margin-bottom: 15px;
@@ -76,34 +83,25 @@
         /* Button Colors */
         #addBtn { background-color: #007bff; color: white; }
         #completeBtn { background-color: #ffc107; color: #333; }
-        
-        #downloadBtn {
-            background-color: #007bff; /* Blue */
-            color: white;
-        }
-        #editBtn { 
-            background-color: #6c757d; 
-            color: white; 
-            margin-top: 0; 
-        }
-        
+        #downloadBtn { background-color: #007bff; color: white; }
+        #editBtn { background-color: #6c757d; color: white; margin-top: 0; }
         #openCameraBtn {
              background-color: #17a2b8;
              color: white;
              margin-top: 0;
              margin-bottom: 10px;
         }
-        
         #clearBtn {
             background-color: #dc3545; /* Red */
             color: white;
             font-size: 14px;
             padding: 10px;
-            margin-top: 20px; /* Space above */
+            margin-top: 20px;
         }
+        #setSchoolBtn { background-color: #28a745; color: white; }
+        #editSchoolBtn { background-color: #6c757d; color: white; width: auto; padding: 5px 10px; font-size: 12px; }
 
         /* --- Student List Styling --- */
-        #studentList { max-width: 600px; margin: 20px auto 0 auto; }
         #studentList div {
             background: #fff; padding: 10px 15px; border-radius: 4px;
             margin-bottom: 5px; border: 1px solid #eee; display: flex;
@@ -123,7 +121,32 @@
             width: auto; margin-top: 0; flex-shrink: 0;
         }
         
-        /* Photo Preview in Form */
+        /* NEW: Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #eee;
+            border-radius: 5px;
+            margin-top: 5px;
+            display: none;
+        }
+        .progress-bar-inner {
+            width: 0%;
+            height: 100%;
+            background-color: #007bff;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        
+        /* NEW: Sync Status Icon */
+        .sync-status {
+            font-size: 18px;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        .sync-offline { color: #6c757d; } /* Offline */
+        .sync-synced { color: #28a745; } /* Synced */
+        
         #photoPreview {
             width: 100px; height: 100px; display: none; margin-top: 10px;
             object-fit: cover; border-radius: 4px; border: 1px solid #ccc;
@@ -131,84 +154,35 @@
         
         /* --- Camera Modal Styling --- */
         #cameraModal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.9);
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; background-color: rgba(0,0,0,0.9);
+            flex-direction: column; justify-content: center; align-items: center;
         }
-        #cameraVideo {
-            width: 100%;
-            max-width: 600px;
-            height: auto;
-            background: #333;
-        }
+        #cameraVideo { width: 100%; max-width: 600px; height: auto; background: #333; }
         #captureBtn {
-            width: 80%;
-            max-width: 300px;
-            padding: 15px;
-            font-size: 18px;
-            background-color: #dc3545;
-            color: white;
-            margin-top: 20px;
+            width: 80%; max-width: 300px; padding: 15px; font-size: 18px;
+            background-color: #dc3545; color: white; margin-top: 20px;
         }
         #closeCameraBtn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            font-size: 24px;
-            color: white;
-            background: none;
-            border: none;
-            cursor: pointer;
-            width: auto;
+            position: absolute; top: 20px; right: 20px; font-size: 24px;
+            color: white; background: none; border: none; cursor: pointer; width: auto;
         }
         #cameraCanvas { display: none; }
 
         /* --- Confirmation Modal --- */
         #confirmModal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            align-items: center;
-            justify-content: center;
+            display: none; position: fixed; z-index: 2000; left: 0; top: 0;
+            width: 100%; height: 100%; background-color: rgba(0,0,0,0.6);
+            align-items: center; justify-content: center;
         }
         .modal-content {
-            background-color: #fff;
-            padding: 20px 30px;
-            border-radius: 8px;
-            text-align: center;
-            max-width: 300px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            background-color: #fff; padding: 20px 30px; border-radius: 8px;
+            text-align: center; max-width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        .modal-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-        }
-        .modal-buttons button {
-            width: 48%;
-            margin: 0;
-        }
-        #confirmYesBtn {
-            background-color: #dc3545;
-            color: white;
-        }
-        #confirmNoBtn {
-            background-color: #6c757d;
-            color: white;
-        }
+        .modal-buttons { display: flex; justify-content: space-between; margin-top: 20px; }
+        .modal-buttons button { width: 48%; margin: 0; }
+        #confirmYesBtn { background-color: #dc3545; color: white; }
+        #confirmNoBtn { background-color: #6c757d; color: white; }
 
     </style>
 </head>
@@ -216,7 +190,26 @@
 
     <h1 id="mainTitle">Student Data Entry</h1>
     
-    <div id="entryForm">
+    <!-- NEW: School Name Section -->
+    <div id="schoolSection" class="card">
+        <h3>School Name</h3>
+        <div>
+            <label for="schoolName">Enter School Name:</label>
+            <input type="text" id="schoolName" placeholder="e.g., Saraswati Sisu Mandir">
+        </div>
+        <button id="setSchoolBtn">Set School</button>
+    </div>
+
+    <div id="schoolDisplay" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong id="schoolNameDisplay"></strong>
+            </div>
+            <button id="editSchoolBtn">Edit School</button>
+        </div>
+    </div>
+    
+    <div id="entryForm" class="card">
         <h3>Add Students</h3>
         <div>
             <label for="name">Full Name:</label>
@@ -226,7 +219,7 @@
             <label for="class">Class:</label>
             <select id="class" required>
                 <option value="">ଶ୍ରେଣୀ ବାଛନ୍ତୁ</option>
-                <option value="ଶିଶୁ ବାଟିକା">ଶିଶୁ ବାଟିକା</option>
+                <option value="ବଟିକା">ବଟିକା</option>
                 <option value="ପ୍ରଥମ">ପ୍ରଥମ</option>
                 <option value="ଦ୍ଵିତୀୟ">ଦ୍ଵିତୀୟ</option>
                 <option value="ତୃତୀୟ">ତୃତୀୟ</option>
@@ -252,7 +245,6 @@
             <input type="text" id="phone" placeholder="ଫୋନ୍ ନମ୍ବର">
         </div>
         
-        <!-- NEW: Blood Group Dropdown -->
         <div>
             <label for="bloodGroup">Blood Group:</label>
             <select id="bloodGroup">
@@ -287,9 +279,7 @@
         </div>
         
         <button id="clearBtn">Clear All Data</button>
-        
-        <!-- This is the moved Submit button -->
-        <button id="completeBtn" disabled>Submit</button> 
+        <button id="completeBtn" disabled>Download Excel/ZIP</button> 
     </div>
     
     <div id="shareSection" style="display:none;">
@@ -326,7 +316,10 @@
         let students = [];
         let capturedPhotoFile = null; 
         let cameraStream = null; 
-        let db; // Our IndexedDB database
+        let localDB; // Our IndexedDB database
+        let fbDB; // Firebase Firestore
+        let fbStorage; // Firebase Storage
+        let currentSchoolName = '';
 
         // --- Get All DOM Elements ---
         const entryForm = document.getElementById('entryForm');
@@ -337,7 +330,7 @@
         const rollInput = document.getElementById('roll');
         const dobInput = document.getElementById('dob');
         const phoneInput = document.getElementById('phone');
-        const bloodGroupSelect = document.getElementById('bloodGroup'); // NEW
+        const bloodGroupSelect = document.getElementById('bloodGroup'); 
         const photoInput = document.getElementById('photo');
         const photoPreview = document.getElementById('photoPreview');
         const shareSection = document.getElementById('shareSection');
@@ -360,6 +353,75 @@
         const cameraCanvas = document.getElementById('cameraCanvas');
         const captureBtn = document.getElementById('captureBtn');
 
+        const schoolSection = document.getElementById('schoolSection');
+        const schoolDisplay = document.getElementById('schoolDisplay');
+        const schoolNameInput = document.getElementById('schoolName');
+        const schoolNameDisplay = document.getElementById('schoolNameDisplay');
+        const setSchoolBtn = document.getElementById('setSchoolBtn');
+        const editSchoolBtn = document.getElementById('editSchoolBtn');
+        
+        // --- 0. Initialize Firebase ---
+        try {
+            // !! IMPORTANT !!
+            // REPLACE THIS WITH YOUR *NEW* FIREBASE CONFIG
+            const firebaseConfig = {
+              apiKey: "AIza...",
+              authDomain: "YOUR-PROJECT-ID.firebaseapp.com",
+              projectId: "YOUR-PROJECT-ID",
+              storageBucket: "YOUR-PROJECT-ID.appspot.com",
+              messagingSenderId: "...",
+              appId: "...",
+              measurementId: "G-..."
+            };
+
+            // Initialize Firebase
+            firebase.initializeApp(firebaseConfig);
+            
+            // Get references to Firebase services
+            fbDB = firebase.firestore();
+            fbStorage = firebase.storage();
+
+            console.log("Firebase initialized successfully");
+        } catch (e) {
+            console.error("Error initializing Firebase. Please check your config.", e);
+            alert("Could not connect to the server. Please check your Firebase config.");
+        }
+
+        // --- 1. School Name Logic ---
+        function setSchool(schoolName) {
+            currentSchoolName = schoolName;
+            localStorage.setItem('schoolName', schoolName); // Save to local storage
+            schoolNameDisplay.textContent = `School: ${schoolName}`;
+            schoolSection.style.display = 'none';
+            schoolDisplay.style.display = 'block';
+            entryForm.style.display = 'block';
+            loadStudentsFromDB(); // Load students for this school
+        }
+        
+        setSchoolBtn.addEventListener('click', () => {
+            const name = schoolNameInput.value.trim();
+            if (name) {
+                setSchool(name);
+            } else {
+                alert('Please enter a school name.');
+            }
+        });
+        
+        editSchoolBtn.addEventListener('click', () => {
+            schoolSection.style.display = 'block';
+            schoolDisplay.style.display = 'none';
+            entryForm.style.display = 'none';
+            studentListDiv.innerHTML = ''; // Clear list when changing schools
+            students = []; // Clear local array
+        });
+        
+        // Check for saved school name on load
+        const savedSchool = localStorage.getItem('schoolName');
+        if (savedSchool) {
+            schoolNameInput.value = savedSchool;
+            setSchool(savedSchool);
+        }
+
         // --- PREVENT ACCIDENTAL BACK BUTTON ---
         window.addEventListener('beforeunload', (e) => {
             if (students.length > 0 || nameInput.value) {
@@ -377,38 +439,50 @@
         }
         
         // --- IndexedDB Setup ---
-        const request = indexedDB.open('studentDB', 1);
+        const request = indexedDB.open('studentDB-v2', 1); // v2 for new data structure
 
         request.onupgradeneeded = (e) => {
-            db = e.target.result;
-            db.createObjectStore('students', { keyPath: 'id' });
+            localDB = e.target.result;
+            // Create one store per school
+            // This is complex. Let's simplify: one store, index on schoolName.
+            if (!localDB.objectStoreNames.contains('students')) {
+                const store = localDB.createObjectStore('students', { keyPath: 'id' });
+                store.createIndex('schoolName', 'schoolName', { unique: false });
+            }
         };
 
         request.onsuccess = (e) => {
-            db = e.target.result;
-            console.log('Database opened successfully');
-            loadStudentsFromDB();
+            localDB = e.target.result;
+            console.log('Local database opened successfully');
+            if (currentSchoolName) {
+                loadStudentsFromDB();
+            }
         };
-
-        request.onerror = (e) => {
-            console.error('Error opening database', e.target.error);
-        };
+        request.onerror = (e) => { console.error('Error opening local database', e.target.error); };
         
-        // --- Function to load all students from DB ---
+        // --- Function to load students for the CURRENT school from DB ---
         function loadStudentsFromDB() {
-            if (!db) return;
-            const transaction = db.transaction(['students'], 'readonly');
+            if (!localDB || !currentSchoolName) return;
+            
+            const transaction = localDB.transaction(['students'], 'readonly');
             const store = transaction.objectStore('students');
-            const getAllRequest = store.getAll();
+            const index = store.index('schoolName');
+            const getRequest = index.getAll(currentSchoolName); // Get only for this school
 
-            getAllRequest.onsuccess = () => {
-                students = getAllRequest.result;
-                console.log(`Loaded ${students.length} students from DB.`);
+            getRequest.onsuccess = () => {
+                students = getRequest.result;
+                console.log(`Loaded ${students.length} students from local DB for ${currentSchoolName}.`);
                 renderStudentList();
+                
+                // Try to upload any unsynced students
+                students.forEach(student => {
+                    if (!student.synced) {
+                        console.log(`Found unsynced student: ${student.name}. Attempting upload...`);
+                        uploadStudent(student);
+                    }
+                });
             };
-            getAllRequest.onerror = (e) => {
-                console.error('Error fetching students:', e.target.error);
-            };
+            getRequest.onerror = (e) => { console.error('Error fetching students:', e.target.error); };
         }
         
         // --- Function to render a single student ---
@@ -418,22 +492,27 @@
             
             let photoUrl;
             try {
-                // Create a local URL for the photo blob/file
                 photoUrl = URL.createObjectURL(student.photoFile);
             } catch (e) {
-                console.error("Could not create object URL for student photo:", e);
-                photoUrl = 'https://placehold.co/40x40/eee/aaa?text=ERR'; // Fallback
+                photoUrl = 'https://placehold.co/40x40/eee/aaa?text=ERR';
             }
 
-            // NEW: Conditionally add blood group to the preview
             const bloodGroupText = student.bloodGroup ? ` | Blood: ${student.bloodGroup}` : '';
+            
+            // NEW: Show sync status and progress bar
+            const syncIcon = student.synced ? '✅' : '☁️';
+            const syncClass = student.synced ? 'sync-synced' : 'sync-offline';
 
             studentDiv.innerHTML = `
                 <img src="${photoUrl}" class="list-preview-img" alt="Photo">
                 <div class="student-info">
                     <span class="student-main-details"><strong>${student.name}</strong> (Class: ${student.class}, Roll: ${student.roll})</span>
                     <span class="student-sub-details">DOB: ${student.dobOdia || 'N/A'}${bloodGroupText}</span>
+                    <div class="progress-bar" id="progress-${student.id}">
+                        <div class="progress-bar-inner"></div>
+                    </div>
                 </div>
+                <span class="sync-status ${syncClass}" id="sync-${student.id}">${syncIcon}</span>
                 <button class="deleteBtn" data-id="${student.id}">Delete</button>
             `;
             studentListDiv.appendChild(studentDiv);
@@ -445,7 +524,6 @@
             students.forEach(student => {
                 renderStudent(student);
             });
-            // Enable/Disable buttons based on student count
             completeBtn.disabled = students.length === 0;
             clearBtn.style.display = students.length === 0 ? 'none' : 'block';
         }
@@ -455,7 +533,6 @@
             if (!dateString) return '';
             try {
                 const [year, month, day] = dateString.split('-');
-                if (!year || !month || !day) return '';
                 const odiaYear = year.split('').map(d => odiaDigits[parseInt(d)]).join('');
                 const odiaDay = day.split('').map(d => odiaDigits[parseInt(d)]).join('');
                 const odiaMonthName = odiaMonths[parseInt(month) - 1];
@@ -467,9 +544,8 @@
         function generateRandomText(length) {
             let result = '';
             const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-            const charactersLength = characters.length;
             for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * charactersLength));
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
             }
             return result;
         }
@@ -501,17 +577,22 @@
         });
 
 
-        // --- 2. ADD STUDENT (Save to IndexedDB) ---
-        addBtn.addEventListener('click', () => {
+        // --- 2. ADD STUDENT (Save to IndexedDB + Start Upload) ---
+        addBtn.addEventListener('click', async () => {
+            if (!currentSchoolName) {
+                alert('Error: School name is not set.');
+                return;
+            }
+
             const classVal = classSelect.value.trim();
             const rollVal = rollInput.value.trim();
             const nameVal = nameInput.value.trim();
             const dobVal = dobInput.value;
-            const bloodGroupVal = bloodGroupSelect.value.trim(); // NEW
+            const bloodGroupVal = bloodGroupSelect.value.trim(); 
 
             const photoFromCamera = capturedPhotoFile;
             const photoFromGallery = photoInput.files[0];
-            const originalPhoto = photoFromCamera || photoFromGallery; // This is a File/Blob
+            const originalPhoto = photoFromCamera || photoFromGallery; 
             const photoName = originalPhoto ? originalPhoto.name : '';
 
             if (!nameVal || !classVal || !rollVal) {
@@ -524,48 +605,51 @@
             }
             
             const odiaDOB = convertToOdiaDate(dobVal);
-            
-            // Generate random text for filename
             const extension = photoName.split('.').pop().toLowerCase() || 'jpg';
-            const randomName = generateRandomText(10); // Using new helper function
+            const randomName = generateRandomText(10); 
             const newFilename = `${randomName}.${extension}`;
             
             const studentId = Date.now();
             const student = {
                 id: studentId,
+                schoolName: currentSchoolName, // NEW
                 name: nameVal,
                 class: classVal,
                 dob: dobVal,
                 dobOdia: odiaDOB, 
-                bloodGroup: bloodGroupVal, // NEW
+                bloodGroup: bloodGroupVal, 
                 roll: rollVal,
                 phone: phoneInput.value,
-                photoFile: originalPhoto, // Store the actual File/Blob object
-                newPhotoName: newFilename
+                photoFile: originalPhoto, 
+                newPhotoName: newFilename,
+                synced: false, // NEW
+                photoURL: '' // NEW
             };
             
-            if (!db) {
+            // --- 1. Save to Local DB FIRST ---
+            if (!localDB) {
                 alert("Database is not ready. Please wait a moment and try again.");
                 return;
             }
-            // --- Save to IndexedDB ---
-            const transaction = db.transaction(['students'], 'readwrite');
+            const transaction = localDB.transaction(['students'], 'readwrite');
             const store = transaction.objectStore('students');
             const request = store.add(student);
 
             request.onsuccess = () => {
-                console.log('Student added to DB');
-                
+                console.log('Student added to local DB');
                 students.push(student);
-                renderStudentList(); // Re-render
+                renderStudentList(); // Re-render to show new student with 'offline' icon
                 
-                // Clear form
+                // --- 2. Start Firebase Upload ---
+                uploadStudent(student);
+
+                // --- 3. Clear Form ---
                 nameInput.value = '';
                 classSelect.value = '';
                 rollInput.value = '';
                 dobInput.value = '';
                 phoneInput.value = '';
-                bloodGroupSelect.value = ''; // NEW
+                bloodGroupSelect.value = ''; 
                 photoInput.value = ''; 
                 capturedPhotoFile = null; 
                 photoPreview.src = '';
@@ -574,10 +658,89 @@
             };
 
             request.onerror = (e) => {
-                console.error('Error adding student to DB:', e.target.error);
-                alert('Could not save student to database.');
+                console.error('Error adding student to local DB:', e.target.error);
+                alert('Could not save student locally.');
             };
         });
+        
+        // --- NEW: UPLOAD STUDENT TO FIREBASE ---
+        function uploadStudent(student) {
+            if (!fbStorage || !fbDB) {
+                console.error("Firebase is not initialized. Cannot upload.");
+                return;
+            }
+            
+            const progressBar = document.getElementById(`progress-${student.id}`);
+            if (progressBar) progressBar.style.display = 'block';
+
+            // 1. Upload Photo to Firebase Storage
+            const filePath = `photos/${student.schoolName}/${student.newPhotoName}`;
+            const storageRef = fbStorage.ref(filePath);
+            const uploadTask = storageRef.put(student.photoFile);
+
+            // Listen for state changes, errors, and completion of the upload.
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    // Progress
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    if (progressBar) {
+                        progressBar.querySelector('.progress-bar-inner').style.width = progress + '%';
+                    }
+                }, 
+                (error) => {
+                    // Handle unsuccessful uploads
+                    console.error('Upload failed:', error);
+                    alert(`Upload failed for ${student.name}. Will retry when online.`);
+                }, 
+                () => {
+                    // Handle successful uploads on complete
+                    console.log('Photo uploaded successfully');
+                    uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+                        console.log('File available at', downloadURL);
+
+                        // 2. Save Text Data to Firestore Database
+                        const studentDataForFirestore = {
+                            id: student.id,
+                            schoolName: student.schoolName,
+                            name: student.name,
+                            class: student.class,
+                            dob: student.dob,
+                            bloodGroup: student.bloodGroup,
+                            roll: student.roll,
+                            phone: student.phone,
+                            newPhotoName: student.newPhotoName,
+                            photoURL: downloadURL, // The public URL for the admin
+                            submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        
+                        // Use student ID as the document ID
+                        fbDB.collection('students').doc(student.id.toString()).set(studentDataForFirestore)
+                        .then(() => {
+                            console.log('Student data saved to Firestore');
+                            
+                            // 3. Update Local DB to mark as 'synced'
+                            student.synced = true;
+                            student.photoURL = downloadURL;
+                            
+                            const tx = localDB.transaction(['students'], 'readwrite');
+                            const store = tx.objectStore('students');
+                            store.put(student); // 'put' will update the existing record
+                            
+                            // 4. Update UI
+                            if (progressBar) progressBar.style.display = 'none';
+                            const syncIcon = document.getElementById(`sync-${student.id}`);
+                            if (syncIcon) {
+                                syncIcon.textContent = '✅';
+                                syncIcon.className = 'sync-status sync-synced';
+                            }
+                        })
+                        .catch((error) => {
+                            console.error("Error writing document to Firestore: ", error);
+                        });
+                    });
+                }
+            );
+        }
         
         // --- STUDENT PHOTO PREVIEW ---
         function handlePhotoPreview(file) {
@@ -597,34 +760,42 @@
             }
         });
 
-        // --- 2b. DELETE STUDENT (from IndexedDB) ---
+        // --- 2b. DELETE STUDENT (from Local + Firebase) ---
         studentListDiv.addEventListener('click', (e) => {
             if (e.target.classList.contains('deleteBtn')) {
-                // Get ID from button. Note: It's a number!
                 const studentId = Number(e.target.dataset.id);
                 
-                const transaction = db.transaction(['students'], 'readwrite');
+                // 1. Delete from Local DB
+                const transaction = localDB.transaction(['students'], 'readwrite');
                 const store = transaction.objectStore('students');
                 const request = store.delete(studentId);
 
                 request.onsuccess = () => {
-                    console.log('Student deleted from DB');
-                    // Remove from local array
+                    console.log('Student deleted from local DB');
                     students = students.filter(s => s.id !== studentId); 
-                    renderStudentList(); // Re-render the list
+                    renderStudentList(); 
+                    
+                    // 2. Delete from Firebase (Firestore document)
+                    fbDB.collection('students').doc(studentId.toString()).delete()
+                    .then(() => console.log('Student doc deleted from Firestore'))
+                    .catch((err) => console.error('Error deleting from Firestore: ', err));
+                    
+                    // Note: We are not deleting the photo from Storage to keep it simple.
+                    // This is a common practice (orphaned files).
                 };
-                request.onerror = (e) => {
-                    console.error('Error deleting student:', e.target.error);
-                };
+                request.onerror = (e) => { console.error('Error deleting student:', e.target.error); };
             }
         });
 
-        // --- 3. COMPLETE ADDING (Submit Button) ---
+        // --- 3. COMPLETE ADDING (Submit Button - now just for local download) ---
         completeBtn.addEventListener('click', () => {
             if (students.length === 0) return;
+            // This button no longer "submits", it just prepares a local download
+            // So we'll just show the export screen
             entryForm.style.display = 'none';
             shareSection.style.display = 'block';
         });
+        completeBtn.textContent = 'Download Local Backup (Excel/ZIP)'; // Changed text
 
         // --- 3b. EDIT BUTTON (Back to Edit) ---
         editBtn.addEventListener('click', () => {
@@ -632,66 +803,51 @@
             entryForm.style.display = 'block';
         });
 
-        // --- 4. EXPORT FUNCTIONS (Create Excel) ---
+        // --- 4. EXPORT FUNCTIONS (Create Excel from LOCAL data) ---
         async function createZipData() {
-            
-            // 1. Convert student data to Excel format
+            // This function now just zips the local 'students' array
             const dataForExcel = students.map(student => {
                 const photoPath = 'E:\\photo\\' + student.newPhotoName;
-
-                // Format the date as DD/MM/YYYY
                 let formattedDob = '';
                 if (student.dob) {
                     try {
                         const [year, month, day] = student.dob.split('-');
                         formattedDob = `${day}/${month}/${year}`;
                     } catch (e) {
-                        console.error('Could not parse date:', student.dob);
-                        formattedDob = student.dob; // Fallback to original
+                        formattedDob = student.dob; 
                     }
                 }
-                
-                // Return object with the exact headers
                 return {
                     name: student.name,
                     class: student.class,
                     dob: formattedDob,
-                    bloodGroup: student.bloodGroup || '', // NEW
+                    bloodGroup: student.bloodGroup || '', 
                     rollno: student.roll,
                     phone: student.phone,
                     photo: photoPath
                 };
             });
 
-            // 2. Create Worksheet and Workbook using xlsx.js
-            // NEW: Added 'bloodGroup' to header
             const worksheet = XLSX.utils.json_to_sheet(dataForExcel, {
                 header: ['name', 'class', 'dob', 'bloodGroup', 'rollno', 'phone', 'photo']
             });
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Students"); // Name the sheet "Students"
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
 
-            // 3. Generate Excel file as a buffer
             const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-            
-            // 4. Convert buffer to a Blob
             const excelBlob = new Blob([excelBuffer], { 
                 type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             });
 
-            // 5. Create Zip and add files
             const zip = new JSZip();
-            
-            // Add the new Excel file
             zip.file('student_data.xlsx', excelBlob); 
             
-            // Add all the photos
             students.forEach(student => {
                 zip.file(student.newPhotoName, student.photoFile);
             });
 
             const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const zipFileName = 'student_id_data.zip';
+            const zipFileName = `${currentSchoolName}_backup.zip`;
             
             return { zipBlob, zipFileName };
         }
@@ -726,13 +882,13 @@
             document.body.removeChild(link);
         }
 
-        // --- 6. Clear All Data and Modal Logic ---
+        // --- 6. Clear All Data (Local Only) ---
         clearBtn.addEventListener('click', () => {
-            confirmText.textContent = 'Are you sure you want to delete all student data? This cannot be undone.';
+            confirmText.textContent = `Are you sure you want to delete all ${students.length} students for ${currentSchoolName} from your *local device*? This will not affect the server.`;
             confirmModal.style.display = 'flex';
         });
 
-        confirmNoBtn.addEventListener('click', () => {
+        confirmNoBtn.addEventListener('click', ()_ => {
             confirmModal.style.display = 'none';
         });
 
@@ -742,23 +898,38 @@
         });
 
         function clearAllData() {
-            if (!db) return;
-            const transaction = db.transaction(['students'], 'readwrite');
+            if (!localDB) return;
+            const transaction = localDB.transaction(['students'], 'readwrite');
             const store = transaction.objectStore('students');
-            const request = store.clear(); // Clears the whole store
+            const index = store.index('schoolName');
+            const getRequest = index.getAll(currentSchoolName);
 
-            request.onsuccess = () => {
-                console.log('Student data cleared from DB');
-                students = []; // Clear local array
-                renderStudentList(); // Re-render (will empty list and disable buttons)
-            };
-            request.onerror = (e) => {
-                console.error('Error clearing data:', e.target.error);
+            getRequest.onsuccess = () => {
+                const studentsToDelete = getRequest.result;
+                let deleteCount = 0;
+                
+                if (studentsToDelete.length === 0) {
+                    students = [];
+                    renderStudentList();
+                    return;
+                }
+                
+                const deleteTx = localDB.transaction(['students'], 'readwrite');
+                const deleteStore = deleteTx.objectStore('students');
+
+                studentsToDelete.forEach(student => {
+                    deleteStore.delete(student.id).onsuccess = () => {
+                        deleteCount++;
+                        if (deleteCount === studentsToDelete.length) {
+                             console.log(`Cleared ${deleteCount} students from local DB`);
+                             students = []; // Clear local array
+                             renderStudentList(); // Re-render
+                        }
+                    };
+                });
             };
         }
 
     </script>
 </body>
 </html>
-
-
