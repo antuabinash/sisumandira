@@ -888,7 +888,8 @@
             confirmModal.style.display = 'flex';
         });
 
-        confirmNoBtn.addEventListener('click', ()_ => {
+        // --- FIXED TYPO HERE ---
+        confirmNoBtn.addEventListener('click', () => { // Removed the stray '_'
             confirmModal.style.display = 'none';
         });
 
@@ -933,4 +934,3 @@
     </script>
 </body>
 </html>
-
