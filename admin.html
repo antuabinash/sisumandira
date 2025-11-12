@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Student Data</title>
+    
+    <!-- Add JSZip and SheetJS (for Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        h1 { color: #0056b3; text-align: center; }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        .filters {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: flex-end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        button {
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+        }
+        #downloadAllBtn { background-color: #28a745; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        th {
+            background-color: #f2f2f2;
+            white-space: nowrap;
+        }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        .photo-link {
+            font-size: 12px;
+        }
+        
+        #loading {
+            text-align: center;
+            font-size: 1.2em;
+            padding: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Admin Panel</h1>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label for="schoolFilter">Filter by School:</label>
+                <select id="schoolFilter">
+                    <option value="all">Show All Schools</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <button id="downloadSelectedBtn" disabled>Download Selected School</button>
+            </div>
+            <div class="filter-group">
+                <button id="downloadAllBtn" disabled>Download All (ZIP)</button>
+            </div>
+        </div>
+        
+        <p id="loading">Loading data from server...</p>
+        
+        <table id="studentTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>School</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Roll No</th>
+                    <th>DOB</th>
+                    <th>Phone</th>
+                    <th>Blood</th>
+                    <th>Photo File</th>
+                    <th>Submitted</th>
+                </tr>
+            </thead>
+            <tbody id="studentTableBody">
+                <!-- Data will be populated by JS -->
+            </tbody>
+        </table>
+        
+    </div>
+
+    <script>
+        let allStudentsData = [];
+        let uniqueSchools = new Set();
+        let fbDB;
+        
+        const schoolFilter = document.getElementById('schoolFilter');
+        const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        const loading = document.getElementById('loading');
+        const studentTable = document.getElementById('studentTable');
+        const studentTableBody = document.getElementById('studentTableBody');
+    
+        // --- 0. Initialize Firebase ---
+        try {
+            // !! IMPORTANT !!
+            // PASTE THE *EXACT SAME* CONFIG YOU USED IN APP.HTML
+            const firebaseConfig = {
+              apiKey: "AIza...",
+              authDomain: "YOUR-PROJECT-ID.firebaseapp.com",
+              projectId: "YOUR-PROJECT-ID",
+              storageBucket: "YOUR-PROJECT-ID.appspot.com",
+              messagingSenderId: "...",
+              appId: "...",
+              measurementId: "G-..."
+            };
+
+            firebase.initializeApp(firebaseConfig);
+            fbDB = firebase.firestore();
+            console.log("Firebase initialized successfully for Admin");
+            
+            // --- 1. Load All Data from Firestore ---
+            loadAllData();
+            
+        } catch (e) {
+            console.error("Error initializing Firebase.", e);
+            loading.textContent = "Error: Could not connect to Firebase. Check config and security rules.";
+        }
+
+        function loadAllData() {
+            fbDB.collection('students').orderBy('submittedAt', 'desc').onSnapshot(
+                (snapshot) => {
+                    allStudentsData = [];
+                    uniqueSchools.clear();
+                    
+                    if (snapshot.empty) {
+                        loading.textContent = 'No data submitted yet.';
+                        studentTable.style.display = 'none';
+                        return;
+                    }
+
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        allStudentsData.push(data);
+                        if (data.schoolName) {
+                            uniqueSchools.add(data.schoolName);
+                        }
+                    });
+
+                    console.log(`Loaded ${allStudentsData.length} total records.`);
+                    populateSchoolFilter();
+                    renderTable(allStudentsData);
+                    
+                    loading.style.display = 'none';
+                    studentTable.style.display = 'table';
+                    downloadAllBtn.disabled = false;
+                },
+                (error) => {
+                    console.error("Error listening to Firestore:", error);
+                    loading.textContent = "Error loading data. Check console and security rules.";
+                }
+            );
+        }
+        
+        function populateSchoolFilter() {
+            // Clear existing options (except 'all')
+            while (schoolFilter.options.length > 1) {
+                schoolFilter.remove(1);
+            }
+            
+            uniqueSchools.forEach(school => {
+                const option = document.createElement('option');
+                option.value = school;
+                option.textContent = school;
+                schoolFilter.appendChild(option);
+            });
+        }
+        
+        function renderTable(studentList) {
+            studentTableBody.innerHTML = ''; // Clear table
+            
+            studentList.forEach(student => {
+                const tr = document.createElement('tr');
+                
+                // Format date
+                let formattedDob = '';
+                if (student.dob) {
+                    try {
+                        const [year, month, day] = student.dob.split('-');
+                        formattedDob = `${day}/${month}/${year}`;
+                    } catch (e) { formattedDob = student.dob; }
+                }
+                
+                // Format timestamp
+                let submitted = 'N/A';
+                if (student.submittedAt && student.submittedAt.toDate) {
+                    submitted = student.submittedAt.toDate().toLocaleString();
+                }
+
+                tr.innerHTML = `
+                    <td>${student.schoolName || 'N/A'}</td>
+                    <td>${student.name || ''}</td>
+                    <td>${student.class || ''}</td>
+                    <td>${student.roll || ''}</td>
+                    <td>${formattedDob}</td>
+                    <td>${student.phone || ''}</td>
+                    <td>${student.bloodGroup || ''}</td>
+                    <td><a href="${student.photoURL}" target="_blank" class="photo-link">${student.newPhotoName || 'Link'}</a></td>
+                    <td>${submitted}</td>
+                `;
+                studentTableBody.appendChild(tr);
+            });
+        }
+        
+        // --- 2. Filter Logic ---
+        schoolFilter.addEventListener('change', () => {
+            const selectedSchool = schoolFilter.value;
+            
+            if (selectedSchool === 'all') {
+                renderTable(allStudentsData);
+                downloadSelectedBtn.disabled = true;
+            } else {
+                const filteredList = allStudentsData.filter(s => s.schoolName === selectedSchool);
+                renderTable(filteredList);
+                downloadSelectedBtn.disabled = false;
+            }
+        });
+        
+        // --- 3. Download Logic ---
+        downloadAllBtn.addEventListener('click', () => {
+            downloadZipPackage(allStudentsData, 'All_Schools_Data');
+        });
+        
+        downloadSelectedBtn.addEventListener('click', () => {
+            const selectedSchool = schoolFilter.value;
+            if (selectedSchool === 'all') return;
+            
+            const filteredList = allStudentsData.filter(s => s.schoolName === selectedSchool);
+            downloadZipPackage(filteredList, selectedSchool.replace(/[^a-zA-Z0-9]/g, '_'));
+        });
+        
+        
+        async function downloadZipPackage(studentList, zipName) {
+            if (studentList.length === 0) {
+                alert('No data to download.');
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Processing... (0%)';
+            button.disabled = true;
+
+            try {
+                // 1. Create Excel File
+                const dataForExcel = studentList.map(student => {
+                    const photoPath = 'E:\\photo\\' + student.newPhotoName;
+                    let formattedDob = '';
+                    if (student.dob) {
+                        try {
+                            const [year, month, day] = student.dob.split('-');
+                            formattedDob = `${day}/${month}/${year}`;
+                        } catch (e) { formattedDob = student.dob; }
+                    }
+                    return {
+                        name: student.name,
+                        class: student.class,
+                        dob: formattedDob,
+                        bloodGroup: student.bloodGroup || '', 
+                        rollno: student.roll,
+                        phone: student.phone,
+                        photo: photoPath,
+                        schoolName: student.schoolName
+                    };
+                });
+                
+                const worksheet = XLSX.utils.json_to_sheet(dataForExcel, {
+                    header: ['schoolName', 'name', 'class', 'dob', 'bloodGroup', 'rollno', 'phone', 'photo']
+                });
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                const excelBlob = new Blob([excelBuffer], { 
+                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                });
+
+                // 2. Create Zip and add Excel
+                const zip = new JSZip();
+                zip.file('student_data.xlsx', excelBlob); 
+                
+                const photosFolder = zip.folder('photos');
+                
+                // 3. Fetch all photos from Firebase Storage and add to zip
+                // This is complex and can fail if there are too many.
+                // We will fetch them one by one.
+                let photosProcessed = 0;
+                
+                for (const student of studentList) {
+                    if (student.photoURL) {
+                        try {
+                            // Fetch the photo from its public URL
+                            const response = await fetch(student.photoURL);
+                            if (!response.ok) throw new Error('Photo not found');
+                            const photoBlob = await response.blob();
+                            
+                            // Add to zip, inside the 'photos' folder
+                            photosFolder.file(student.newPhotoName, photoBlob);
+                            
+                        } catch (e) {
+                            console.error(`Failed to fetch photo for ${student.name}: ${e.message}`);
+                            // We can add a text file as a warning
+                            photosFolder.file(`${student.newPhotoName}_ERROR.txt`, `Could not download photo for ${student.name}.`);
+                        }
+                    }
+                    
+                    // Update progress
+                    photosProcessed++;
+                    button.textContent = `Processing... (${Math.round((photosProcessed / studentList.length) * 100)}%)`;
+                }
+                
+                // 4. Generate and download final ZIP
+                button.textContent = 'Zipping...';
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                downloadBlob(zipBlob, `${zipName}.zip`, 'application/zip');
+
+            } catch (err) {
+                console.error('Error creating zip package:', err);
+                alert('An error occurred while creating the zip file. ' + err.message);
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+        
+        function downloadBlob(content, fileName, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+    </script>
+</body>
+</html>
