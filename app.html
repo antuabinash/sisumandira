@@ -128,14 +128,18 @@
             background-color: #eee;
             border-radius: 5px;
             margin-top: 5px;
-            display: none;
+            display: none; /* Hidden by default */
         }
         .progress-bar-inner {
             width: 0%;
             height: 100%;
-            background-color: #007bff;
+            background-color: #007bff; /* Blue for in-progress */
             border-radius: 5px;
-            transition: width 0.3s ease;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        /* NEW: Green color for 100% */
+        .progress-bar-inner.progress-complete {
+            background-color: #28a745; /* Green */
         }
         
         /* NEW: Sync Status Icon */
@@ -492,7 +496,14 @@
             
             let photoUrl;
             try {
-                photoUrl = URL.createObjectURL(student.photoFile);
+                // Check if photoFile exists. If not (e.g. old data), use photoURL
+                if (student.photoFile) {
+                    photoUrl = URL.createObjectURL(student.photoFile);
+                } else if (student.photoURL) {
+                    photoUrl = student.photoURL; // Use the Firebase URL
+                } else {
+                    photoUrl = 'https://placehold.co/40x40/eee/aaa?text=...';
+                }
             } catch (e) {
                 photoUrl = 'https://placehold.co/40x40/eee/aaa?text=ERR';
             }
@@ -504,12 +515,12 @@
             const syncClass = student.synced ? 'sync-synced' : 'sync-offline';
 
             studentDiv.innerHTML = `
-                <img src="${photoUrl}" class="list-preview-img" alt="Photo">
+                <img src="${photoUrl}" class="list-preview-img" alt="Photo" onerror="this.src='https://placehold.co/40x40/eee/aaa?text=ERR'">
                 <div class="student-info">
                     <span class="student-main-details"><strong>${student.name}</strong> (Class: ${student.class}, Roll: ${student.roll})</span>
                     <span class="student-sub-details">DOB: ${student.dobOdia || 'N/A'}${bloodGroupText}</span>
                     <div class="progress-bar" id="progress-${student.id}">
-                        <div class="progress-bar-inner"></div>
+                        <div class="progress-bar-inner" id="progress-inner-${student.id}"></div>
                     </div>
                 </div>
                 <span class="sync-status ${syncClass}" id="sync-${student.id}">${syncIcon}</span>
@@ -663,15 +674,16 @@
             };
         });
         
-        // --- NEW: UPLOAD STUDENT TO FIREBASE ---
+        // --- NEW: UPLOAD STUDENT TO FIREBASE (FIXED) ---
         function uploadStudent(student) {
             if (!fbStorage || !fbDB) {
                 console.error("Firebase is not initialized. Cannot upload.");
                 return;
             }
             
-            const progressBar = document.getElementById(`progress-${student.id}`);
-            if (progressBar) progressBar.style.display = 'block';
+            const progressBarContainer = document.getElementById(`progress-${student.id}`);
+            const progressBarInner = document.getElementById(`progress-inner-${student.id}`);
+            if (progressBarContainer) progressBarContainer.style.display = 'block';
 
             // 1. Upload Photo to Firebase Storage
             const filePath = `photos/${student.schoolName}/${student.newPhotoName}`;
@@ -683,8 +695,8 @@
                 (snapshot) => {
                     // Progress
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    if (progressBar) {
-                        progressBar.querySelector('.progress-bar-inner').style.width = progress + '%';
+                    if (progressBarInner) {
+                        progressBarInner.style.width = progress + '%';
                     }
                 }, 
                 (error) => {
@@ -695,6 +707,12 @@
                 () => {
                     // Handle successful uploads on complete
                     console.log('Photo uploaded successfully');
+                    
+                    // --- MODIFIED: Show Green Bar ---
+                    if (progressBarInner) {
+                        progressBarInner.classList.add('progress-complete');
+                    }
+                    
                     uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
                         console.log('File available at', downloadURL);
 
@@ -719,20 +737,27 @@
                             console.log('Student data saved to Firestore');
                             
                             // 3. Update Local DB to mark as 'synced'
-                            student.synced = true;
-                            student.photoURL = downloadURL;
+                            // We need to create a new student object without the 'photoFile'
+                            // because IndexedDB cannot store a File object *after* it has been used/streamed.
+                            // We will store the photoURL instead.
+                            const syncedStudent = { ...student };
+                            delete syncedStudent.photoFile; // Remove file blob from local db
+                            syncedStudent.synced = true;
+                            syncedStudent.photoURL = downloadURL;
                             
                             const tx = localDB.transaction(['students'], 'readwrite');
                             const store = tx.objectStore('students');
-                            store.put(student); // 'put' will update the existing record
+                            store.put(syncedStudent); // 'put' will update the existing record
                             
-                            // 4. Update UI
-                            if (progressBar) progressBar.style.display = 'none';
-                            const syncIcon = document.getElementById(`sync-${student.id}`);
-                            if (syncIcon) {
-                                syncIcon.textContent = '✅';
-                                syncIcon.className = 'sync-status sync-synced';
-                            }
+                            // 4. Update UI after a delay
+                            setTimeout(() => {
+                                if (progressBarContainer) progressBarContainer.style.display = 'none';
+                                const syncIcon = document.getElementById(`sync-${student.id}`);
+                                if (syncIcon) {
+                                    syncIcon.textContent = '✅';
+                                    syncIcon.className = 'sync-status sync-synced';
+                                }
+                            }, 1000); // Wait 1 second to show green bar
                         })
                         .catch((error) => {
                             console.error("Error writing document to Firestore: ", error);
@@ -806,68 +831,89 @@
         // --- 4. EXPORT FUNCTIONS (Create Excel from LOCAL data) ---
         async function createZipData() {
             // This function now just zips the local 'students' array
-            const dataForExcel = students.map(student => {
-                const photoPath = 'E:\\photo\\' + student.newPhotoName;
-                let formattedDob = '';
-                if (student.dob) {
-                    try {
-                        const [year, month, day] = student.dob.split('-');
-                        formattedDob = `${day}/${month}/${year}`;
-                    } catch (e) {
-                        formattedDob = student.dob; 
+            // We must re-fetch from DB to get photoFile blobs
+            const transaction = localDB.transaction(['students'], 'readonly');
+            const store = transaction.objectStore('students');
+            const index = store.index('schoolName');
+            const getRequest = index.getAll(currentSchoolName);
+
+            getRequest.onsuccess = async (e) => {
+                const studentsFromDB = e.target.result;
+                
+                const dataForExcel = studentsFromDB.map(student => {
+                    const photoPath = 'E:\\photo\\' + student.newPhotoName;
+                    let formattedDob = '';
+                    if (student.dob) {
+                        try {
+                            const [year, month, day] = student.dob.split('-');
+                            formattedDob = `${day}/${month}/${year}`;
+                        } catch (e) {
+                            formattedDob = student.dob; 
+                        }
                     }
-                }
-                return {
-                    name: student.name,
-                    class: student.class,
-                    dob: formattedDob,
-                    bloodGroup: student.bloodGroup || '', 
-                    rollno: student.roll,
-                    phone: student.phone,
-                    photo: photoPath
-                };
-            });
+                    return {
+                        name: student.name,
+                        class: student.class,
+                        dob: formattedDob,
+                        bloodGroup: student.bloodGroup || '', 
+                        rollno: student.roll,
+                        phone: student.phone,
+                        photo: photoPath
+                    };
+                });
 
-            const worksheet = XLSX.utils.json_to_sheet(dataForExcel, {
-                header: ['name', 'class', 'dob', 'bloodGroup', 'rollno', 'phone', 'photo']
-            });
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+                const worksheet = XLSX.utils.json_to_sheet(dataForExcel, {
+                    header: ['name', 'class', 'dob', 'bloodGroup', 'rollno', 'phone', 'photo']
+                });
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
 
-            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-            const excelBlob = new Blob([excelBuffer], { 
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            });
+                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                const excelBlob = new Blob([excelBuffer], { 
+                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                });
 
-            const zip = new JSZip();
-            zip.file('student_data.xlsx', excelBlob); 
+                const zip = new JSZip();
+                zip.file('student_data.xlsx', excelBlob); 
+                
+                studentsFromDB.forEach(student => {
+                    // Only add if photoFile blob exists
+                    if(student.photoFile) {
+                        zip.file(student.newPhotoName, student.photoFile);
+                    }
+                });
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const zipFileName = `${currentSchoolName}_backup.zip`;
+                
+                // Manually re-enable button and download
+                downloadBtn.textContent = 'Download Data';
+                downloadBtn.disabled = false;
+                downloadBlob(zipBlob, zipFileName, 'application/zip');
+            };
             
-            students.forEach(student => {
-                zip.file(student.newPhotoName, student.photoFile);
-            });
-
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const zipFileName = `${currentSchoolName}_backup.zip`;
-            
-            return { zipBlob, zipFileName };
+            getRequest.onerror = (e) => {
+                console.error("Error fetching students for download:", e);
+                alert("Error: Could not read student data for download.");
+                downloadBtn.textContent = 'Download Data';
+                downloadBtn.disabled = false;
+            };
         }
         
         downloadBtn.addEventListener('click', async () => {
             if (students.length === 0) return;
             downloadBtn.textContent = 'Processing...';
             downloadBtn.disabled = true;
-
-            try {
-                const { zipBlob, zipFileName } = await createZipData();
-                downloadBlob(zipBlob, zipFileName, 'application/zip');
-            } catch (err) {
+            
+            // The createZipData function now handles the download and re-enabling
+            createZipData().catch(err => {
                 console.error('Error downloading zip file:', err);
                 alert('Could not create zip file. Error: ' + err.message);
-            } finally {
                 downloadBtn.textContent = 'Download Data';
                 downloadBtn.disabled = false;
-            }
+            });
         });
+
 
         // --- 5. Helper function to trigger download ---
         function downloadBlob(content, fileName, contentType) {
@@ -888,8 +934,7 @@
             confirmModal.style.display = 'flex';
         });
 
-        // --- FIXED TYPO HERE ---
-        confirmNoBtn.addEventListener('click', () => { // Removed the stray '_'
+        confirmNoBtn.addEventListener('click', () => {
             confirmModal.style.display = 'none';
         });
 
