@@ -1,20 +1,17 @@
-// MODIFIED: New cache name
-const CACHE_NAME = 'student-data-cache-v4-firebase';
+// UPDATE: Cache version bumped to force refresh
+const CACHE_NAME = 'student-data-cache-v7-spark';
 
-// MODIFIED: Added all Firebase SDKs
 const urlsToCache = [
   './',
   'index.html',
   'app.html',
-  // We don't cache admin.html, as it's for online use
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js',
-  'https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js'
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js'
 ];
 
 // Install the service worker and cache files
@@ -25,7 +22,6 @@ self.addEventListener('install', event => {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
-      .then(() => self.skipWaiting()) // Force activation
   );
 });
 
@@ -39,15 +35,13 @@ self.addEventListener('fetch', event => {
           return response;
         }
         // Not in cache - fetch from network
-        return fetch(event.request).catch(() => {
-            console.log('Network request failed. Serving from cache (if available).');
-        });
+        return fetch(event.request);
       }
     )
   );
 });
 
-// --- NEW: Clean up old caches ---
+// Clean up old caches
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
@@ -55,12 +49,10 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            // Delete old caches
             return caches.delete(cacheName);
           }
         })
       );
     })
-    .then(() => self.clients.claim()) // Take control immediately
   );
 });
