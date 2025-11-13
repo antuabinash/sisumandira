@@ -1,5 +1,5 @@
 // UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v7-spark';
+const CACHE_NAME = 'student-data-cache-v8-final';
 
 const urlsToCache = [
   './',
