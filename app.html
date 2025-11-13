@@ -49,9 +49,7 @@
         button:disabled { background-color: #ccc; cursor: not-allowed; }
         
         #addBtn { background-color: #007bff; color: white; }
-        #completeBtn { background-color: #ffc107; color: #333; }
-        #downloadBtn { background-color: #007bff; color: white; }
-        #editBtn { background-color: #6c757d; color: white; margin-top: 0; }
+        #completeBtn { background-color: #ffc107; color: #333; } 
         #openCameraBtn { background-color: #17a2b8; color: white; margin-top: 0; margin-bottom: 10px; }
         #clearBtn { background-color: #dc3545; color: white; font-size: 14px; padding: 10px; margin-top: 20px; }
         #setSchoolBtn { background-color: #28a745; color: white; }
@@ -144,14 +142,11 @@
         <div id="studentList"></div>
         
         <button id="clearBtn">Clear All Data</button>
+        <!-- MODIFIED: Trigger download directly -->
         <button id="completeBtn" disabled>Download Local Backup (Excel/ZIP)</button> 
     </div>
     
-    <div id="shareSection" style="display:none;">
-        <h3>Export Data</h3>
-        <button id="downloadBtn">Download Data</button>
-        <button id="editBtn">Back to Edit</button>
-    </div>
+    <!-- MODIFIED: Share Section Removed -->
 
     <div id="cameraModal"><button id="closeCameraBtn">&times;</button><video id="cameraVideo" playsinline autoplay></video><canvas id="cameraCanvas"></canvas><button id="captureBtn">Capture</button></div>
     <div id="confirmModal"><div class="modal-content"><p id="confirmText">Are you sure?</p><div class="modal-buttons"><button id="confirmYesBtn">Yes</button><button id="confirmNoBtn">No</button></div></div></div>
@@ -161,7 +156,7 @@
         const odiaMonths = ['ଜାନୁଆରୀ', 'ଫେବୃଆରୀ', 'ମାର୍ଚ୍ଚ', 'ଅପ୍ରେଲ', 'ମଇ', 'ଜୁନ୍', 'ଜୁଲାଇ', 'ଅଗଷ୍ଟ', 'ସେପ୍ଟେମ୍ବର', 'ଅକ୍ଟୋବର', 'ନଭେମ୍ବର', 'ଡିସେମ୍ବର'];
         let students = [], capturedPhotoFile = null, cameraStream = null, localDB, fbDB, currentSchoolName = '';
 
-        const entryForm = document.getElementById('entryForm'), completeBtn = document.getElementById('completeBtn'), addBtn = document.getElementById('addBtn'), nameInput = document.getElementById('name'), classSelect = document.getElementById('class'), rollInput = document.getElementById('roll'), dobInput = document.getElementById('dob'), phoneInput = document.getElementById('phone'), bloodGroupSelect = document.getElementById('bloodGroup'), photoInput = document.getElementById('photo'), photoPreview = document.getElementById('photoPreview'), shareSection = document.getElementById('shareSection'), downloadBtn = document.getElementById('downloadBtn'), editBtn = document.getElementById('editBtn'), studentListDiv = document.getElementById('studentList'), clearBtn = document.getElementById('clearBtn'), confirmModal = document.getElementById('confirmModal'), confirmYesBtn = document.getElementById('confirmYesBtn'), confirmNoBtn = document.getElementById('confirmNoBtn'), confirmText = document.getElementById('confirmText'), cameraModal = document.getElementById('cameraModal'), openCameraBtn = document.getElementById('openCameraBtn'), closeCameraBtn = document.getElementById('closeCameraBtn'), cameraVideo = document.getElementById('cameraVideo'), cameraCanvas = document.getElementById('cameraCanvas'), captureBtn = document.getElementById('captureBtn'), schoolSection = document.getElementById('schoolSection'), schoolDisplay = document.getElementById('schoolDisplay'), schoolNameInput = document.getElementById('schoolName'), schoolNameDisplay = document.getElementById('schoolNameDisplay'), setSchoolBtn = document.getElementById('setSchoolBtn'), editSchoolBtn = document.getElementById('editSchoolBtn');
+        const entryForm = document.getElementById('entryForm'), completeBtn = document.getElementById('completeBtn'), addBtn = document.getElementById('addBtn'), nameInput = document.getElementById('name'), classSelect = document.getElementById('class'), rollInput = document.getElementById('roll'), dobInput = document.getElementById('dob'), phoneInput = document.getElementById('phone'), bloodGroupSelect = document.getElementById('bloodGroup'), photoInput = document.getElementById('photo'), photoPreview = document.getElementById('photoPreview'), studentListDiv = document.getElementById('studentList'), clearBtn = document.getElementById('clearBtn'), confirmModal = document.getElementById('confirmModal'), confirmYesBtn = document.getElementById('confirmYesBtn'), confirmNoBtn = document.getElementById('confirmNoBtn'), confirmText = document.getElementById('confirmText'), cameraModal = document.getElementById('cameraModal'), openCameraBtn = document.getElementById('openCameraBtn'), closeCameraBtn = document.getElementById('closeCameraBtn'), cameraVideo = document.getElementById('cameraVideo'), cameraCanvas = document.getElementById('cameraCanvas'), captureBtn = document.getElementById('captureBtn'), schoolSection = document.getElementById('schoolSection'), schoolDisplay = document.getElementById('schoolDisplay'), schoolNameInput = document.getElementById('schoolName'), schoolNameDisplay = document.getElementById('schoolNameDisplay'), setSchoolBtn = document.getElementById('setSchoolBtn'), editSchoolBtn = document.getElementById('editSchoolBtn');
         
         try {
             // YOUR SPECIFIC KEYS EMBEDDED HERE
@@ -314,8 +309,22 @@
             }
         });
 
-        completeBtn.addEventListener('click', () => { if (students.length) { entryForm.style.display='none'; shareSection.style.display='block'; } });
-        editBtn.addEventListener('click', () => { shareSection.style.display='none'; entryForm.style.display='block'; });
+        // MODIFIED: Direct Download Logic
+        completeBtn.addEventListener('click', async () => { 
+            if (!students.length) return;
+            completeBtn.disabled = true; 
+            completeBtn.textContent = "Processing...";
+            
+            try {
+                const {zipBlob, zipFileName} = await createZipData();
+                downloadBlob(zipBlob, zipFileName, 'application/zip');
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                completeBtn.disabled = false;
+                completeBtn.textContent = "Download Local Backup (Excel/ZIP)";
+            }
+        });
 
         async function createZipData() {
              return new Promise((resolve, reject) => {
@@ -326,10 +335,16 @@
                     const dbStudents = e.target.result;
                     const excelData = dbStudents.map(s => {
                         let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
+                        // Removed schoolName column
                         return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
                     });
                     const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
-                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students");
+                    const wb = XLSX.utils.book_new(); 
+                    
+                    // Use School Name for the Excel Sheet Name (Sanitize for invalid chars)
+                    const sheetName = (currentSchoolName || "Students").replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                    
                     const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
                     const zip = new JSZip(); zip.file('student_data.xlsx', excelBlob);
                     
@@ -348,7 +363,7 @@
                 };
             });
         }
-        downloadBtn.addEventListener('click', async () => { if (!students.length) return; downloadBtn.disabled = true; downloadBtn.textContent = 'Processing...'; try { const {zipBlob, zipFileName} = await createZipData(); downloadBlob(zipBlob, zipFileName, 'application/zip'); } catch(e) { alert(e); } finally { downloadBtn.disabled = false; downloadBtn.textContent = 'Download Data'; } });
+        
         function downloadBlob(content, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], {type})); a.download = name; a.click(); }
         clearBtn.addEventListener('click', () => { confirmText.textContent = `Delete ALL local data for ${currentSchoolName}?`; confirmModal.style.display = 'flex'; });
         confirmNoBtn.addEventListener('click', () => confirmModal.style.display = 'none');
