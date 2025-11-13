@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ID Card Data Entry</title>
-    <!-- Add JSZip and SheetJS (for Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs (Firestore Only) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js"></script>
     
     <link rel="manifest" href="manifest.json">
 
@@ -161,25 +159,24 @@
     <script>
         const odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
         const odiaMonths = ['ଜାନୁଆରୀ', 'ଫେବୃଆରୀ', 'ମାର୍ଚ୍ଚ', 'ଅପ୍ରେଲ', 'ମଇ', 'ଜୁନ୍', 'ଜୁଲାଇ', 'ଅଗଷ୍ଟ', 'ସେପ୍ଟେମ୍ବର', 'ଅକ୍ଟୋବର', 'ନଭେମ୍ବର', 'ଡିସେମ୍ବର'];
-        let students = [], capturedPhotoFile = null, cameraStream = null, localDB, fbDB, fbStorage, currentSchoolName = '';
+        let students = [], capturedPhotoFile = null, cameraStream = null, localDB, fbDB, currentSchoolName = '';
 
         const entryForm = document.getElementById('entryForm'), completeBtn = document.getElementById('completeBtn'), addBtn = document.getElementById('addBtn'), nameInput = document.getElementById('name'), classSelect = document.getElementById('class'), rollInput = document.getElementById('roll'), dobInput = document.getElementById('dob'), phoneInput = document.getElementById('phone'), bloodGroupSelect = document.getElementById('bloodGroup'), photoInput = document.getElementById('photo'), photoPreview = document.getElementById('photoPreview'), shareSection = document.getElementById('shareSection'), downloadBtn = document.getElementById('downloadBtn'), editBtn = document.getElementById('editBtn'), studentListDiv = document.getElementById('studentList'), clearBtn = document.getElementById('clearBtn'), confirmModal = document.getElementById('confirmModal'), confirmYesBtn = document.getElementById('confirmYesBtn'), confirmNoBtn = document.getElementById('confirmNoBtn'), confirmText = document.getElementById('confirmText'), cameraModal = document.getElementById('cameraModal'), openCameraBtn = document.getElementById('openCameraBtn'), closeCameraBtn = document.getElementById('closeCameraBtn'), cameraVideo = document.getElementById('cameraVideo'), cameraCanvas = document.getElementById('cameraCanvas'), captureBtn = document.getElementById('captureBtn'), schoolSection = document.getElementById('schoolSection'), schoolDisplay = document.getElementById('schoolDisplay'), schoolNameInput = document.getElementById('schoolName'), schoolNameDisplay = document.getElementById('schoolNameDisplay'), setSchoolBtn = document.getElementById('setSchoolBtn'), editSchoolBtn = document.getElementById('editSchoolBtn');
         
         try {
-            // !! IMPORTANT !! REPLACE WITH YOUR NEW KEYS
+            // YOUR SPECIFIC KEYS EMBEDDED HERE
             const firebaseConfig = {
-  apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
-  authDomain: "idcard-60586.firebaseapp.com",
-  projectId: "idcard-60586",
-  storageBucket: "idcard-60586.firebasestorage.app",
-  messagingSenderId: "331979663377",
-  appId: "1:331979663377:web:026e537a7fcaca813129b0",
-  measurementId: "G-PXVV87C78S"
-};
+              apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+              authDomain: "idcard-60586.firebaseapp.com",
+              projectId: "idcard-60586",
+              storageBucket: "idcard-60586.firebasestorage.app",
+              messagingSenderId: "331979663377",
+              appId: "1:331979663377:web:026e537a7fcaca813129b0",
+              measurementId: "G-PXVV87C78S"
+            };
             firebase.initializeApp(firebaseConfig);
             fbDB = firebase.firestore();
-            fbStorage = firebase.storage();
-            console.log("Firebase initialized");
+            console.log("Firebase initialized (Firestore Only)");
         } catch (e) { console.error("Firebase Init Error:", e); }
 
         function setSchool(name) { currentSchoolName = name; localStorage.setItem('schoolName', name); schoolNameDisplay.textContent = `School: ${name}`; schoolSection.style.display = 'none'; schoolDisplay.style.display = 'block'; entryForm.style.display = 'block'; loadStudentsFromDB(); }
@@ -189,7 +186,7 @@
 
         if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js')); }
         
-        const request = indexedDB.open('studentDB-v2', 1);
+        const request = indexedDB.open('studentDB-v3-base64', 1);
         request.onupgradeneeded = (e) => { localDB = e.target.result; if (!localDB.objectStoreNames.contains('students')) { const store = localDB.createObjectStore('students', { keyPath: 'id' }); store.createIndex('schoolName', 'schoolName', { unique: false }); } };
         request.onsuccess = (e) => { localDB = e.target.result; if (currentSchoolName) loadStudentsFromDB(); };
         
@@ -205,7 +202,9 @@
         function renderStudent(student) {
             const div = document.createElement('div');
             div.dataset.studentId = student.id;
-            let url; try { if(student.photoFile) url = URL.createObjectURL(student.photoFile); else url = student.photoURL || 'https://placehold.co/40x40/eee/aaa?text=...'; } catch(e) { url = 'https://placehold.co/40x40/eee/aaa?text=ERR'; }
+            // Use Base64 directly for preview if available, else blob
+            let url = student.photoBase64 || (student.photoFile ? URL.createObjectURL(student.photoFile) : 'https://placehold.co/40x40/eee/aaa?text=...');
+            
             const blood = student.bloodGroup ? ` | Blood: ${student.bloodGroup}` : '';
             const syncIcon = student.synced ? '✅' : '☁️';
             const syncClass = student.synced ? 'sync-synced' : 'sync-offline';
@@ -221,6 +220,30 @@
         openCameraBtn.addEventListener('click', (e) => { e.preventDefault(); startCamera(); }); closeCameraBtn.addEventListener('click', stopCamera);
         captureBtn.addEventListener('click', () => { cameraCanvas.width = cameraVideo.videoWidth; cameraCanvas.height = cameraVideo.videoHeight; cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0); cameraCanvas.toBlob((b) => { capturedPhotoFile = new File([b], 'cam.jpg', { type: 'image/jpeg' }); handlePhotoPreview(capturedPhotoFile); stopCamera(); }, 'image/jpeg', 0.9); });
 
+        // Image Compressor
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 800; // Limit size
+                        const scaleSize = MAX_WIDTH / img.width;
+                        canvas.width = MAX_WIDTH;
+                        canvas.height = img.height * scaleSize;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        // Compress to JPEG at 70% quality
+                        resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+                    };
+                };
+                reader.onerror = (error) => reject(error);
+            });
+        }
+
         addBtn.addEventListener('click', async () => {
             try {
                 if (!currentSchoolName) { alert('School name not set.'); return; }
@@ -229,8 +252,18 @@
                 if (!name || !cls || !roll) { alert('Fill Name, Class, Roll.'); return; }
                 if (!photo) { alert('Upload Photo.'); return; }
                 
+                const base64Image = await compressImage(photo);
+                
                 const ext = photo.name ? (photo.name.split('.').pop().toLowerCase() || 'jpg') : 'jpg';
-                const student = { id: Date.now(), schoolName: currentSchoolName, name: name, class: cls, dob: dob, dobOdia: convertToOdiaDate(dob), bloodGroup: bg, roll: roll, phone: phoneInput.value, photoFile: photo, newPhotoName: `${generateRandomText(10)}.${ext}`, synced: false, photoURL: '' };
+                const student = { 
+                    id: Date.now(), 
+                    schoolName: currentSchoolName, 
+                    name: name, class: cls, dob: dob, dobOdia: convertToOdiaDate(dob), bloodGroup: bg, roll: roll, phone: phoneInput.value, 
+                    photoFile: photo, 
+                    photoBase64: base64Image, 
+                    newPhotoName: `${generateRandomText(10)}.${ext}`, 
+                    synced: false 
+                };
                 
                 if (!localDB) { alert("Database loading..."); return; }
                 const tx = localDB.transaction(['students'], 'readwrite');
@@ -242,40 +275,30 @@
         });
         
         function uploadStudent(student) {
-            // 1. CHECK FIREBASE
-            if (!fbStorage || !fbDB) { 
-                alert("Firebase not connected! Please check keys in code."); 
-                return; 
-            }
+            if (!fbDB) { alert("Firebase not connected."); return; }
             
-            // 2. SHOW PROGRESS BAR
             const barContainer = document.getElementById(`progress-${student.id}`);
             const barInner = document.getElementById(`progress-inner-${student.id}`);
-            if (barContainer) barContainer.style.display = 'block';
+            if (barContainer) { barContainer.style.display = 'block'; barInner.style.width = '50%'; }
 
-            // 3. ATTEMPT UPLOAD
-            const ref = fbStorage.ref(`photos/${student.schoolName}/${student.newPhotoName}`);
-            const task = ref.put(student.photoFile);
+            const data = { 
+                id: student.id, schoolName: student.schoolName, 
+                name: student.name, class: student.class, dob: student.dob, 
+                bloodGroup: student.bloodGroup, roll: student.roll, phone: student.phone, 
+                newPhotoName: student.newPhotoName, 
+                photoBase64: student.photoBase64, 
+                submittedAt: firebase.firestore.FieldValue.serverTimestamp() 
+            };
 
-            task.on('state_changed', 
-                (snap) => { if (barInner) barInner.style.width = ((snap.bytesTransferred / snap.totalBytes) * 100) + '%'; }, 
-                (error) => { 
-                    // ERROR HANDLING - ALERT USER
-                    console.error('Upload Error:', error);
-                    alert("Upload Failed: " + error.message); 
-                }, 
-                () => {
-                    if (barInner) { barInner.style.width = '100%'; barInner.classList.add('progress-complete'); }
-                    task.snapshot.ref.getDownloadURL().then((url) => {
-                        const data = { id: student.id, schoolName: student.schoolName, name: student.name, class: student.class, dob: student.dob, bloodGroup: student.bloodGroup, roll: student.roll, phone: student.phone, newPhotoName: student.newPhotoName, photoURL: url, submittedAt: firebase.firestore.FieldValue.serverTimestamp() };
-                        fbDB.collection('students').doc(student.id.toString()).set(data).then(() => {
-                            const synced = { ...student }; delete synced.photoFile; synced.synced = true; synced.photoURL = url;
-                            const tx = localDB.transaction(['students'], 'readwrite'); tx.objectStore('students').put(synced);
-                            setTimeout(() => { if (barContainer) barContainer.style.display = 'none'; const icon = document.getElementById(`sync-${student.id}`); if (icon) { icon.textContent = '✅'; icon.className = 'sync-status sync-synced'; } }, 1500);
-                        });
-                    });
-                }
-            );
+            fbDB.collection('students').doc(student.id.toString()).set(data).then(() => {
+                if (barInner) { barInner.style.width = '100%'; barInner.classList.add('progress-complete'); }
+                const synced = { ...student }; delete synced.photoFile; synced.synced = true; 
+                const tx = localDB.transaction(['students'], 'readwrite'); tx.objectStore('students').put(synced);
+                setTimeout(() => { if (barContainer) barContainer.style.display = 'none'; const icon = document.getElementById(`sync-${student.id}`); if (icon) { icon.textContent = '✅'; icon.className = 'sync-status sync-synced'; } }, 1500);
+            }).catch(error => {
+                console.error("Upload failed", error);
+                alert("Upload failed: " + error.message);
+            });
         }
         
         function handlePhotoPreview(f) { if(f) { photoPreview.src = URL.createObjectURL(f); photoPreview.style.display = 'block'; } else { photoPreview.style.display = 'none'; } }
@@ -295,7 +318,7 @@
         editBtn.addEventListener('click', () => { shareSection.style.display='none'; entryForm.style.display='block'; });
 
         async function createZipData() {
-            return new Promise((resolve, reject) => {
+             return new Promise((resolve, reject) => {
                 const tx = localDB.transaction(['students'], 'readonly');
                 const store = tx.objectStore('students');
                 const index = store.index('schoolName');
@@ -309,7 +332,18 @@
                     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students");
                     const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
                     const zip = new JSZip(); zip.file('student_data.xlsx', excelBlob);
-                    dbStudents.forEach(s => { if(s.photoFile) zip.file(s.newPhotoName, s.photoFile); });
+                    
+                    dbStudents.forEach(s => { 
+                        if(s.photoFile) {
+                            zip.file(s.newPhotoName, s.photoFile); 
+                        } else if (s.photoBase64) {
+                            const byteString = atob(s.photoBase64.split(',')[1]);
+                            const ab = new ArrayBuffer(byteString.length);
+                            const ia = new Uint8Array(ab);
+                            for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                            zip.file(s.newPhotoName, new Blob([ab], {type: 'image/jpeg'}));
+                        }
+                    });
                     zip.generateAsync({ type: 'blob' }).then(blob => resolve({zipBlob: blob, zipFileName: `${currentSchoolName}_backup.zip`}));
                 };
             });
@@ -322,5 +356,3 @@
     </script>
 </body>
 </html>
-
-
