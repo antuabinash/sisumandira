@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Student Data</title>
+    <!-- SheetJS & JSZip for Backup Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Firebase SDKs (Firestore Only) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
     
@@ -18,6 +22,7 @@
         .controls { margin-bottom: 20px; display: flex; gap: 10px; }
         select, button { padding: 10px; font-size: 16px; }
         button { background: #28a745; color: white; border: none; cursor: pointer; }
+        #downloadZipBtn { background: #ffc107; color: #333; }
     </style>
 </head>
 <body>
@@ -28,7 +33,8 @@
             <option value="all">All Schools</option>
         </select>
         <button id="refreshBtn">Refresh Data</button>
-        <button id="downloadExcelBtn">Download Excel</button>
+        <button id="downloadExcelBtn">Download Excel List</button>
+        <button id="downloadZipBtn">Download All Photos & Excel (ZIP)</button>
     </div>
 
     <table id="studentTable">
@@ -55,16 +61,16 @@
         const schoolFilter = document.getElementById('schoolFilter');
 
         try {
-            // !! IMPORTANT !! REPLACE WITH YOUR NEW KEYS
+            // YOUR SPECIFIC KEYS EMBEDDED HERE
             const firebaseConfig = {
-  apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
-  authDomain: "idcard-60586.firebaseapp.com",
-  projectId: "idcard-60586",
-  storageBucket: "idcard-60586.firebasestorage.app",
-  messagingSenderId: "331979663377",
-  appId: "1:331979663377:web:026e537a7fcaca813129b0",
-  measurementId: "G-PXVV87C78S"
-};
+              apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+              authDomain: "idcard-60586.firebaseapp.com",
+              projectId: "idcard-60586",
+              storageBucket: "idcard-60586.firebasestorage.app",
+              messagingSenderId: "331979663377",
+              appId: "1:331979663377:web:026e537a7fcaca813129b0",
+              measurementId: "G-PXVV87C78S"
+            };
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
             
@@ -102,8 +108,9 @@
         function renderTable(data) {
             tableBody.innerHTML = '';
             data.forEach(s => {
+                const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
                 const row = `<tr>
-                    <td><a href="${s.photoURL}" target="_blank"><img src="${s.photoURL}" onerror="this.src='https://placehold.co/50?text=ERR'"></a></td>
+                    <td><img src="${photoSrc}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
                     <td>${s.name}</td>
                     <td>${s.class}</td>
                     <td>${s.roll}</td>
@@ -123,8 +130,7 @@
         });
 
         document.getElementById('downloadExcelBtn').addEventListener('click', () => {
-            if(allStudents.length === 0) return alert("No data to download");
-            
+            if(allStudents.length === 0) return alert("No data");
             const val = schoolFilter.value;
             const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
             
@@ -136,13 +142,55 @@
                 DOB: s.dob,
                 Blood: s.bloodGroup || '',
                 Phone: s.phone,
-                PhotoURL: s.photoURL
+                PhotoName: s.newPhotoName
             }));
-            
             const ws = XLSX.utils.json_to_sheet(excelData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Students");
-            XLSX.writeFile(wb, "Student_Data_Admin.xlsx");
+            XLSX.writeFile(wb, "Student_List.xlsx");
+        });
+
+        document.getElementById('downloadZipBtn').addEventListener('click', async () => {
+            if(allStudents.length === 0) return alert("No data");
+            const btn = document.getElementById('downloadZipBtn');
+            btn.disabled = true; btn.textContent = "Generating Zip...";
+            
+            const val = schoolFilter.value;
+            const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            
+            try {
+                const zip = new JSZip();
+                
+                dataToExport.forEach(s => {
+                    if(s.photoBase64) {
+                        const byteString = atob(s.photoBase64.split(',')[1]);
+                        const ab = new ArrayBuffer(byteString.length);
+                        const ia = new Uint8Array(ab);
+                        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                        zip.file(s.newPhotoName, new Blob([ab], {type: 'image/jpeg'}));
+                    }
+                });
+                
+                const excelData = dataToExport.map(s => {
+                    let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
+                    return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
+                });
+                const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students");
+                const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                zip.file('student_data.xlsx', excelBlob);
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = "Full_Backup.zip";
+                link.click();
+            } catch(e) {
+                console.error(e);
+                alert("Error creating zip: " + e.message);
+            } finally {
+                btn.disabled = false; btn.textContent = "Download All Photos & Excel (ZIP)";
+            }
         });
     </script>
 </body>
