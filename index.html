@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Install Student Data App</title>
-    <!-- Link to the Manifest file -->
     <link rel="manifest" href="manifest.json">
     <style>
         body {
@@ -62,12 +61,9 @@
 
         // 1. Check if already running as an installed PWA
         if (window.matchMedia('(display-mode: standalone)').matches) {
-            // Already installed, go straight to the app
             window.location.href = 'app.html';
         } else {
-            // Not installed, we are in the browser
             loadingMsg.style.display = 'none';
-            // Show "Open App" by default in case install isn't supported
             openBtn.style.display = 'block'; 
         }
 
@@ -75,7 +71,6 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            // Show install button, hide open button
             installBtn.style.display = 'block';
             openBtn.style.display = 'none';
         });
@@ -83,12 +78,21 @@
         // 3. Handle the install button click
         installBtn.addEventListener('click', async () => {
             if (!deferredPrompt) return;
+            
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
+            
+            deferredPrompt = null; 
+            
+            installBtn.style.display = 'none';
+            openBtn.style.display = 'block';
+            
             if (outcome === 'accepted') {
-                console.log('User accepted the install prompt');
+                console.log('User accepted the install prompt. Redirecting...');
+                window.location.href = 'app.html';
+            } else {
+                console.log('User dismissed the install prompt.');
             }
-            deferredPrompt = null;
         });
         
         // 4. Handle the Open App button click
