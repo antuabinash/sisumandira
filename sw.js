@@ -1,10 +1,11 @@
 // UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v9-final-keys';
+const CACHE_NAME = 'student-data-cache-v11-admin-phone-fix';
 
 const urlsToCache = [
   './',
   'index.html',
   'app.html',
+  'admin.html', 
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
