@@ -142,11 +142,8 @@
         <div id="studentList"></div>
         
         <button id="clearBtn">Clear All Data</button>
-        <!-- MODIFIED: Trigger download directly -->
         <button id="completeBtn" disabled>Download Local Backup (Excel/ZIP)</button> 
     </div>
-    
-    <!-- MODIFIED: Share Section Removed -->
 
     <div id="cameraModal"><button id="closeCameraBtn">&times;</button><video id="cameraVideo" playsinline autoplay></video><canvas id="cameraCanvas"></canvas><button id="captureBtn">Capture</button></div>
     <div id="confirmModal"><div class="modal-content"><p id="confirmText">Are you sure?</p><div class="modal-buttons"><button id="confirmYesBtn">Yes</button><button id="confirmNoBtn">No</button></div></div></div>
@@ -197,7 +194,6 @@
         function renderStudent(student) {
             const div = document.createElement('div');
             div.dataset.studentId = student.id;
-            // Use Base64 directly for preview if available, else blob
             let url = student.photoBase64 || (student.photoFile ? URL.createObjectURL(student.photoFile) : 'https://placehold.co/40x40/eee/aaa?text=...');
             
             const blood = student.bloodGroup ? ` | Blood: ${student.bloodGroup}` : '';
@@ -215,7 +211,6 @@
         openCameraBtn.addEventListener('click', (e) => { e.preventDefault(); startCamera(); }); closeCameraBtn.addEventListener('click', stopCamera);
         captureBtn.addEventListener('click', () => { cameraCanvas.width = cameraVideo.videoWidth; cameraCanvas.height = cameraVideo.videoHeight; cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0); cameraCanvas.toBlob((b) => { capturedPhotoFile = new File([b], 'cam.jpg', { type: 'image/jpeg' }); handlePhotoPreview(capturedPhotoFile); stopCamera(); }, 'image/jpeg', 0.9); });
 
-        // Image Compressor
         function compressImage(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -225,13 +220,12 @@
                     img.src = event.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 800; // Limit size
+                        const MAX_WIDTH = 800;
                         const scaleSize = MAX_WIDTH / img.width;
                         canvas.width = MAX_WIDTH;
                         canvas.height = img.height * scaleSize;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        // Compress to JPEG at 70% quality
                         resolve(canvas.toDataURL('image/jpeg', 0.7)); 
                     };
                 };
@@ -309,7 +303,7 @@
             }
         });
 
-        // MODIFIED: Direct Download Logic
+        // ONE-CLICK DOWNLOAD
         completeBtn.addEventListener('click', async () => { 
             if (!students.length) return;
             completeBtn.disabled = true; 
@@ -335,13 +329,13 @@
                     const dbStudents = e.target.result;
                     const excelData = dbStudents.map(s => {
                         let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
-                        // Removed schoolName column
                         return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
                     });
+                    
                     const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
                     const wb = XLSX.utils.book_new(); 
                     
-                    // Use School Name for the Excel Sheet Name (Sanitize for invalid chars)
+                    // Use School Name for the Excel Sheet Name
                     const sheetName = (currentSchoolName || "Students").replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
                     XLSX.utils.book_append_sheet(wb, ws, sheetName);
                     
