@@ -176,14 +176,18 @@
                     return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
                 });
                 const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
-                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students");
+                const wb = XLSX.utils.book_new(); 
+                
+                let sheetName = (val === 'all' ? 'All_Schools' : val).replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                
                 const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
                 zip.file('student_data.xlsx', excelBlob);
 
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(zipBlob);
-                link.download = "Full_Backup.zip";
+                link.download = `${sheetName}_Backup.zip`;
                 link.click();
             } catch(e) {
                 console.error(e);
