@@ -21,8 +21,55 @@
         img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
         .controls { margin-bottom: 20px; display: flex; gap: 10px; }
         select, button { padding: 10px; font-size: 16px; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; border-radius: 4px; }
         #downloadZipBtn { background: #ffc107; color: #333; }
+        
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px 8px;
+            font-size: 12px;
+            width: auto;
+        }
+
+        /* Confirmation Modal */
+        #confirmModal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 300px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            width: 48%;
+            margin: 0;
+        }
+        #confirmYesBtn {
+            background-color: #dc3545;
+            color: white;
+        }
+        #confirmNoBtn {
+            background-color: #6c757d;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -33,7 +80,6 @@
             <option value="all">All Schools</option>
         </select>
         <button id="refreshBtn">Refresh Data</button>
-        <button id="downloadExcelBtn">Download Excel List</button>
         <button id="downloadZipBtn">Download All Photos & Excel (ZIP)</button>
     </div>
 
@@ -46,19 +92,40 @@
                 <th>Roll</th>
                 <th>DOB</th>
                 <th>Blood</th>
-                <th>Phone</th>
+                <th>Phone</th> <!-- MODIFIED: Added Phone Column -->
                 <th>School</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="8">Loading data...</td></tr>
+            <!-- MODIFIED: Colspan changed from 8 to 9 -->
+            <tr><td colspan="9">Loading data...</td></tr>
         </tbody>
     </table>
+
+    <!-- Confirmation Modal HTML -->
+    <div id="confirmModal">
+        <div class="modal-content">
+            <p id="confirmText">Are you sure?</p>
+            <div class="modal-buttons">
+                <button id="confirmYesBtn">Yes</button>
+                <button id="confirmNoBtn">No</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         let allStudents = [];
         const tableBody = document.querySelector('#studentTable tbody');
         const schoolFilter = document.getElementById('schoolFilter');
+        
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmYesBtn = document.getElementById('confirmYesBtn');
+        const confirmNoBtn = document.getElementById('confirmNoBtn');
+        const confirmText = document.getElementById('confirmText');
+        
+        let db; 
+        let idToDelete = null; 
 
         try {
             // YOUR SPECIFIC KEYS EMBEDDED HERE
@@ -72,14 +139,15 @@
               measurementId: "G-PXVV87C78S"
             };
             firebase.initializeApp(firebaseConfig);
-            const db = firebase.firestore();
+            db = firebase.firestore(); 
             
             loadData(db);
             document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
         } catch (e) { alert("Firebase Error: " + e.message); }
 
         function loadData(db) {
-            tableBody.innerHTML = '<tr><td colspan="8">Loading...</td></tr>';
+            // MODIFIED: Colspan changed from 8 to 9
+            tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
             db.collection("students").orderBy("submittedAt", "desc").get().then((querySnapshot) => {
                 allStudents = [];
                 const schools = new Set();
@@ -101,7 +169,8 @@
                 renderTable(allStudents);
             }).catch((error) => {
                 console.log("Error getting documents: ", error);
-                tableBody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
+                // MODIFIED: Colspan changed from 8 to 9
+                tableBody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
             });
         }
 
@@ -109,6 +178,7 @@
             tableBody.innerHTML = '';
             data.forEach(s => {
                 const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
+                // MODIFIED: Added Phone field
                 const row = `<tr>
                     <td><img src="${photoSrc}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
                     <td>${s.name}</td>
@@ -116,8 +186,9 @@
                     <td>${s.roll}</td>
                     <td>${s.dob}</td>
                     <td>${s.bloodGroup || '-'}</td>
-                    <td>${s.phone}</td>
+                    <td>${s.phone || '-'}</td> <!-- ADDED -->
                     <td>${s.schoolName}</td>
+                    <td><button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button></td>
                 </tr>`;
                 tableBody.innerHTML += row;
             });
@@ -129,26 +200,45 @@
             else renderTable(allStudents.filter(s => s.schoolName === val));
         });
 
-        document.getElementById('downloadExcelBtn').addEventListener('click', () => {
-            if(allStudents.length === 0) return alert("No data");
-            const val = schoolFilter.value;
-            const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
-            
-            const excelData = dataToExport.map(s => ({
-                School: s.schoolName,
-                Name: s.name,
-                Class: s.class,
-                Roll: s.roll,
-                DOB: s.dob,
-                Blood: s.bloodGroup || '',
-                Phone: s.phone,
-                PhotoName: s.newPhotoName
-            }));
-            const ws = XLSX.utils.json_to_sheet(excelData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Students");
-            XLSX.writeFile(wb, "Student_List.xlsx");
+        // --- Delete Logic ---
+        tableBody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                idToDelete = e.target.dataset.id;
+                const name = e.target.dataset.name || 'this student';
+                confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
+                confirmModal.style.display = 'flex';
+            }
         });
+
+        confirmNoBtn.addEventListener('click', () => {
+            confirmModal.style.display = 'none';
+            idToDelete = null;
+        });
+
+        confirmYesBtn.addEventListener('click', () => {
+            if (idToDelete) {
+                deleteStudent(idToDelete);
+            }
+            confirmModal.style.display = 'none';
+            idToDelete = null;
+        });
+
+        function deleteStudent(id) {
+            if (!db) return;
+            
+            db.collection("students").doc(id.toString()).delete()
+                .then(() => {
+                    console.log("Document successfully deleted from Firebase!");
+                    allStudents = allStudents.filter(s => s.id.toString() !== id);
+                    const val = schoolFilter.value;
+                    if (val === 'all') renderTable(allStudents);
+                    else renderTable(allStudents.filter(s => s.schoolName === val));
+                }).catch((error) => {
+                    console.error("Error removing document: ", error);
+                });
+        }
+        // --- END: Delete Logic ---
+
 
         document.getElementById('downloadZipBtn').addEventListener('click', async () => {
             if(allStudents.length === 0) return alert("No data");
