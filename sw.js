@@ -1,5 +1,5 @@
 // UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v14-center-crop';
+const CACHE_NAME = 'student-data-cache-v16-manual-crop';
 
 const urlsToCache = [
   './',
@@ -12,7 +12,10 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js'
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js',
+  // NEW: Add Cropper.js to offline cache
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'
 ];
 
 // Install the service worker and cache files
@@ -55,4 +58,3 @@ self.addEventListener('activate', event => {
     })
   );
 });
-
