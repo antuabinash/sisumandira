@@ -1,7 +1,7 @@
-// UPDATE: v24-url-fix
-// This version fixes the "0 KV" bug by ALWAYS fetching AI files from the network.
-// It also has the correct cache name.
-const CACHE_NAME = 'student-data-cache-v24-url-fix';
+// UPDATE: v25-unpkg-fix
+// This version fixes the 404 bug by ALWAYS fetching AI files from the network
+// and telling the admin panel to use unpkg.com, which is a new domain.
+const CACHE_NAME = 'student-data-cache-v25-unpkg-fix';
 
 // These are the "critical" files needed to start the app.
 const urlsToCache = [
@@ -28,7 +28,8 @@ const urlsToCache = [
 
 // List of domains to ALWAYS fetch from network (don't cache)
 const NETWORK_ONLY_DOMAINS = [
-    'cdn.jsdelivr.net', // MediaPipe JS
+    'unpkg.com', // NEW: CDN for MediaPipe JS
+    'cdn.jsdelivr.net', // Old one, just in case
     'storage.googleapis.com' // MediaPipe AI Model (.tflite)
 ];
 
@@ -93,7 +94,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            // Delete old caches (e.g., v23, v22, etc.)
+            // Delete old caches (e.g., v24, v23, etc.)
             return caches.delete(cacheName);
           }
         })
