@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Student Data</title>
-    <!-- SheetJS & JSZip for Backup Download -->
+    <!-- SheetJS & JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- Firebase SDKs (Firestore Only) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <!-- NEW: Cropper.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
@@ -35,26 +39,33 @@
         button:disabled { background: #999; cursor: not-allowed; }
         
         #downloadZipBtn { background: #ffc107; color: #333; }
-        .delete-btn { background-color: #dc3545; color: white; padding: 5px 8px; font-size: 12px; width: auto; }
+        .delete-btn, .crop-btn { padding: 5px 8px; font-size: 12px; width: auto; margin-right: 5px; }
+        .delete-btn { background-color: #dc3545; color: white; }
+        .crop-btn { background-color: #17a2b8; color: white; } /* NEW Crop Button Style */
+        
         #generatorStatus { font-style: italic; color: #555; }
-        
-        /* Generator Grid */
         .generator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        #generateBtn { background-color: #007bff; grid-column: 1 / -1; } /* Spans full width */
+        #generateBtn { background-color: #007bff; grid-column: 1 / -1; } 
         
-        /* Confirmation Modal */
-        #confirmModal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
-        .modal-content { background-color: #fff; padding: 20px 30px; border-radius: 8px; text-align: center; max-width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        /* Modals */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fff; padding: 20px 30px; border-radius: 8px; text-align: center; max-width: 90vw; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .modal-buttons { display: flex; justify-content: space-between; margin-top: 20px; }
         .modal-buttons button { width: 48%; margin: 0; }
         #confirmYesBtn { background-color: #dc3545; color: white; }
         #confirmNoBtn { background-color: #6c757d; color: white; }
+
+        /* NEW: Cropper Modal Styles */
+        #cropModal .modal-content { max-width: 90vw; }
+        #cropImageContainer { width: 100%; max-height: 70vh; }
+        #cropImageContainer img { max-width: 100%; }
+        #saveCropBtn { background-color: #28a745; color: white; }
+        #cancelCropBtn { background-color: #6c757d; color: white; }
     </style>
 </head>
 <body>
     <h1>Admin Panel: Student Data</h1>
     
-    <!-- NEW: ID Card Generator Section -->
     <div class="card">
         <h2>ID Card Generator</h2>
         <div class="generator-grid">
@@ -71,7 +82,6 @@
         <p id="generatorStatus">Please upload a template and font file to begin.</p>
     </div>
 
-    <!-- Data Section -->
     <div class="card">
         <h2>Student Data</h2>
         <div class="controls">
@@ -102,16 +112,30 @@
         </table>
     </div>
 
-    <!-- Hidden Canvas for drawing -->
     <canvas id="cardCanvas" style="display: none;"></canvas>
 
     <!-- Confirmation Modal HTML -->
-    <div id="confirmModal">
+    <div id="confirmModal" class="modal">
         <div class="modal-content">
             <p id="confirmText">Are you sure?</p>
             <div class="modal-buttons">
                 <button id="confirmYesBtn">Yes</button>
                 <button id="confirmNoBtn">No</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NEW: Cropper Modal HTML -->
+    <div id="cropModal" class="modal">
+        <div class="modal-content">
+            <h3>Crop Photo</h3>
+            <p>Set the photo to 187x225 (ID card ratio)</p>
+            <div id="cropImageContainer">
+                <img id="cropImage" src="">
+            </div>
+            <div class="modal-buttons">
+                <button id="saveCropBtn">Save Crop</button>
+                <button id="cancelCropBtn">Cancel</button>
             </div>
         </div>
     </div>
@@ -126,6 +150,14 @@
         const confirmNoBtn = document.getElementById('confirmNoBtn');
         const confirmText = document.getElementById('confirmText');
         
+        // NEW: Cropper Modal Elements
+        const cropModal = document.getElementById('cropModal');
+        const cropImage = document.getElementById('cropImage');
+        const saveCropBtn = document.getElementById('saveCropBtn');
+        const cancelCropBtn = document.getElementById('cancelCropBtn');
+        let cropper = null;
+        let idToCrop = null;
+
         let db; 
         let idToDelete = null; 
         
@@ -138,9 +170,7 @@
         const cardCanvas = document.getElementById('cardCanvas');
         const ctx = cardCanvas.getContext('2d');
         
-        // NEW: Odia Digits for translation
         const odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
-
 
         try {
             // YOUR SPECIFIC KEYS EMBEDDED HERE
@@ -160,7 +190,6 @@
             document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
         } catch (e) { alert("Firebase Error: " + e.message); }
 
-        // NEW: Odia translation function
         function toOdia(text) {
             if (!text) return "";
             return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
@@ -198,7 +227,7 @@
             data.forEach(s => {
                 const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
                 const row = `<tr>
-                    <td><img src="${photoSrc}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
+                    <td><img src="${photoSrc}" id="img-${s.id}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
                     <td>${s.name}</td>
                     <td>${s.class}</td>
                     <td>${s.roll}</td>
@@ -206,7 +235,10 @@
                     <td>${s.bloodGroup || '-'}</td>
                     <td>${s.phone || '-'}</td>
                     <td>${s.schoolName}</td>
-                    <td><button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button></td>
+                    <td>
+                        <button class="crop-btn" data-id="${s.id}">Crop</button>
+                        <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
+                    </td>
                 </tr>`;
                 tableBody.innerHTML += row;
             });
@@ -218,13 +250,23 @@
             else renderTable(allStudents.filter(s => s.schoolName === val));
         });
 
-        // --- Delete Logic ---
+        // --- Delete & Crop Logic ---
         tableBody.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-btn')) {
                 idToDelete = e.target.dataset.id;
                 const name = e.target.dataset.name || 'this student';
                 confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
                 confirmModal.style.display = 'flex';
+            }
+            // NEW: Crop Button Click
+            if (e.target.classList.contains('crop-btn')) {
+                idToCrop = e.target.dataset.id;
+                const student = allStudents.find(s => s.id.toString() === idToCrop);
+                if (student && student.photoBase64) {
+                    openCropper(student.photoBase64);
+                } else {
+                    alert("No photo found for this student to crop.");
+                }
             }
         });
 
@@ -252,6 +294,382 @@
                 }).catch(console.error);
         }
         
+        // --- NEW: Cropper.js Functions ---
+        
+        function openCropper(base64Image) {
+            if (cropper) {
+                cropper.destroy();
+            }
+            cropImage.src = base64Image;
+            cropModal.style.display = 'flex';
+            
+            cropper = new Cropper(cropImage, {
+                aspectRatio: 187 / 225, // ID card ratio
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.8,
+                movable: true,
+                zoomable: true,
+                rotatable: false,
+                scalable: false,
+            });
+        }
+        
+        cancelCropBtn.addEventListener('click', () => {
+            cropModal.style.display = 'none';
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            idToCrop = null;
+        });
+
+        saveCropBtn.addEventListener('click', () => {
+            if (!cropper || !idToCrop) return;
+            
+            saveCropBtn.disabled = true;
+            saveCropBtn.textContent = "Saving...";
+
+            // Get the cropped canvas, draw it to 187x225, and get new Base64
+            const croppedCanvas = cropper.getCroppedCanvas({
+                width: 187,
+                height: 225,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+            
+            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); // 90% quality
+
+            // Update Firebase
+            db.collection("students").doc(idToCrop).update({
+                photoBase64: newBase64
+            })
+            .then(() => {
+                // Update local data
+                const student = allStudents.find(s => s.id.toString() === idToCrop);
+                if (student) {
+                    student.photoBase64 = newBase64;
+                }
+                // Update table thumbnail
+                const tableImg = document.getElementById(`img-${idToCrop}`);
+                if (tableImg) {
+                    tableImg.src = newBase64;
+                }
+                
+                saveCropBtn.disabled = false;
+                saveCropBtn.textContent = "Save Crop";
+                cancelCropBtn.click(); // Close modal
+            })
+            .catch((err) => {
+                alert("Error saving crop: " + err.message);
+                saveCropBtn.disabled = false;
+                saveCropBtn.textContent = "Save Crop";
+            });
+        });
+
+        // --- Raw ZIP Download Logic ---
+        document.getElementById('downloadZipBtn').addEventListener('click', async () => {
+            if(allStudents.length === 0) return alert("No data");
+            const btn = document.getElementById('downloadZipBtn');
+            btn.disabled = true; btn.textContent = "Generating Zip...";
+            
+            const val = schoolFilter.value;
+            const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            
+            try {
+                const zip = new JSZip();
+                dataToExport.forEach(s => {
+                    if(s.photoBase64) {
+                        zip.file(s.newPhotoName, s.photoBase64.split(',')[1], {base64: true});
+                    }
+                });
+                
+                const excelData = dataToExport.map(s => {
+                    let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
+                    return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
+                });
+                const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
+                const wb = XLSX.utils.book_new(); 
+                let sheetName = (val === 'all' ? 'All_Schools' : val).replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                zip.file('student_data.xlsx', excelBlob);
+
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `${sheetName}_Backup.zip`;
+                link.click();
+            } catch(e) {
+                console.error(e);
+                alert("Error creating zip: " + e.message);
+            } finally {
+                btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
+            }
+        });
+
+
+        // --- ID Card Generator Logic ---
+
+        function checkAssetsReady() {
+            if (templateImage && odiaFont) {
+                generateBtn.disabled = false;
+                generatorStatus.textContent = "Assets loaded. Ready to generate cards.";
+            }
+        }
+
+        templateInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                templateImage = new Image();
+                templateImage.src = URL.createObjectURL(file);
+                templateImage.onload = () => {
+                    cardCanvas.width = templateImage.width;
+                    cardCanvas.height = templateImage.height;
+                    generatorStatus.textContent = "Template loaded. Waiting for font...";
+                    checkAssetsReady();
+                };
+            }
+        });
+
+        fontInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    const fontData = await file.arrayBuffer();
+                    odiaFont = new FontFace('OdiaFont', fontData);
+                    document.fonts.add(odiaFont);
+                    await odiaFont.load();
+                    generatorStatus.textContent = "Font loaded. Waiting for template...";
+                    checkAssetsReady();
+                } catch (err) {
+                    console.error("Font load error:", err);
+                    generatorStatus.textContent = "Error loading font file.";
+                }
+            }
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            if (!templateImage || !odiaFont) {
+                alert("Please upload both template and font files.");
+                return;
+            }
+
+            generatorStatus.textContent = "Starting generation... (This may take a while)";
+            generateBtn.disabled = true;
+
+            const val = schoolFilter.value;
+            const dataToGenerate = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            const zip = new JSZip();
+            let count = 0;
+
+            for (const student of dataToGenerate) {
+                try {
+                    const cardBlob = await generateCard(student);
+                    const filename = `${student.name.replace(/ /g, '_')}_${student.roll}.png`;
+                    zip.file(filename, cardBlob);
+                    count++;
+                    generatorStatus.textContent = `Generated card ${count} of ${dataToGenerate.length}...`;
+                } catch (err) {
+                    console.error(`Failed to generate card for ${student.name}:`, err);
+                }
+            }
+
+            generatorStatus.textContent = `Zipping ${count} cards...`;
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+            const link = document.createElement('a');
+            const schoolName = (val === 'all' ? 'All_Schools' : val);
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `ID_Cards_${schoolName}.zip`;
+            link.click();
+
+G-PXVV87C78S"
+            };
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore(); 
+            
+            loadData(db);
+            document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
+        } catch (e) { alert("Firebase Error: " + e.message); }
+
+        function toOdia(text) {
+            if (!text) return "";
+            return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
+        }
+
+        function loadData(db) {
+            tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
+            db.collection("students").orderBy("submittedAt", "desc").get().then((querySnapshot) => {
+                allStudents = [];
+                const schools = new Set();
+                
+                querySnapshot.forEach((doc) => {
+                    const s = doc.data();
+                    allStudents.push(s);
+                    if(s.schoolName) schools.add(s.schoolName);
+                });
+                
+                schoolFilter.innerHTML = '<option value="all">All Schools</option>';
+                schools.forEach(school => {
+                    const opt = document.createElement('option');
+                    opt.value = school;
+                    opt.textContent = school;
+                    schoolFilter.appendChild(opt);
+                });
+                
+                renderTable(allStudents);
+            }).catch((error) => {
+                console.log("Error getting documents: ", error);
+                tableBody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
+            });
+        }
+
+        function renderTable(data) {
+            tableBody.innerHTML = '';
+            data.forEach(s => {
+                const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
+                const row = `<tr>
+                    <td><img src="${photoSrc}" id="img-${s.id}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
+                    <td>${s.name}</td>
+                    <td>${s.class}</td>
+                    <td>${s.roll}</td>
+                    <td>${s.dob}</td>
+                    <td>${s.bloodGroup || '-'}</td>
+                    <td>${s.phone || '-'}</td>
+                    <td>${s.schoolName}</td>
+                    <td>
+                        <button class="crop-btn" data-id="${s.id}">Crop</button>
+                        <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
+                    </td>
+                </tr>`;
+                tableBody.innerHTML += row;
+            });
+        }
+        
+        schoolFilter.addEventListener('change', () => {
+            const val = schoolFilter.value;
+            if (val === 'all') renderTable(allStudents);
+            else renderTable(allStudents.filter(s => s.schoolName === val));
+        });
+
+        // --- Delete & Crop Logic ---
+        tableBody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                idToDelete = e.target.dataset.id;
+                const name = e.target.dataset.name || 'this student';
+                confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
+                confirmModal.style.display = 'flex';
+            }
+            // NEW: Crop Button Click
+            if (e.target.classList.contains('crop-btn')) {
+                idToCrop = e.target.dataset.id;
+                const student = allStudents.find(s => s.id.toString() === idToCrop);
+                if (student && student.photoBase64) {
+                    openCropper(student.photoBase64);
+                } else {
+                    alert("No photo found for this student to crop.");
+                }
+            }
+        });
+
+        confirmNoBtn.addEventListener('click', () => {
+            confirmModal.style.display = 'none';
+            idToDelete = null;
+        });
+
+        confirmYesBtn.addEventListener('click', () => {
+            if (idToDelete) {
+                deleteStudent(idToDelete);
+            }
+            confirmModal.style.display = 'none';
+            idToDelete = null;
+        });
+
+        function deleteStudent(id) {
+            if (!db) return;
+            db.collection("students").doc(id.toString()).delete()
+                .then(() => {
+                    allStudents = allStudents.filter(s => s.id.toString() !== id);
+                    const val = schoolFilter.value;
+                    if (val === 'all') renderTable(allStudents);
+                    else renderTable(allStudents.filter(s => s.schoolName === val));
+                }).catch(console.error);
+        }
+        
+        // --- NEW: Cropper.js Functions ---
+        
+        function openCropper(base64Image) {
+            if (cropper) {
+                cropper.destroy();
+            }
+            cropImage.src = base64Image;
+            cropModal.style.display = 'flex';
+            
+            cropper = new Cropper(cropImage, {
+                aspectRatio: 187 / 225, // ID card ratio
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.8,
+                movable: true,
+                zoomable: true,
+                rotatable: false,
+                scalable: false,
+            });
+        }
+        
+        cancelCropBtn.addEventListener('click', () => {
+            cropModal.style.display = 'none';
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            idToCrop = null;
+        });
+
+        saveCropBtn.addEventListener('click', () => {
+            if (!cropper || !idToCrop) return;
+            
+            saveCropBtn.disabled = true;
+            saveCropBtn.textContent = "Saving...";
+
+            // Get the cropped canvas, draw it to 187x225, and get new Base64
+            const croppedCanvas = cropper.getCroppedCanvas({
+                width: 187,
+                height: 225,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+            
+            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); // 90% quality
+
+            // Update Firebase
+            db.collection("students").doc(idToCrop).update({
+                photoBase64: newBase64
+            })
+            .then(() => {
+                // Update local data
+                const student = allStudents.find(s => s.id.toString() === idToCrop);
+                if (student) {
+                    student.photoBase64 = newBase64;
+                }
+                // Update table thumbnail
+                const tableImg = document.getElementById(`img-${idToCrop}`);
+                if (tableImg) {
+                    tableImg.src = newBase64;
+                }
+                
+                saveCropBtn.disabled = false;
+                saveCropBtn.textContent = "Save Crop";
+                cancelCropBtn.click(); // Close modal
+            })
+            .catch((err) => {
+                alert("Error saving crop: " + err.message);
+                saveCropBtn.disabled = false;
+                saveCropBtn.textContent = "Save Crop";
+            });
+        });
+
         // --- Raw ZIP Download Logic ---
         document.getElementById('downloadZipBtn').addEventListener('click', async () => {
             if(allStudents.length === 0) return alert("No data");
@@ -400,26 +818,25 @@
 
                     if (photoLoaded) {
                         // --- NEW: Smart "Center Crop" Logic ---
+                        // **NOTE:** This crops the *already cropped* image. 
+                        // If you use the manual cropper, this will have no effect.
+                        // If you don't use the manual cropper, this will center crop.
                         const sWidth = photo.width;
                         const sHeight = photo.height;
-                        const targetRatio = pw / ph; // 187 / 225
+                        const targetRatio = pw / ph; 
                         const srcRatio = sWidth / sHeight;
 
                         let sx = 0, sy = 0, new_sWidth = sWidth, new_sHeight = sHeight;
 
                         if (srcRatio > targetRatio) {
-                            // Image is wider than target
                             new_sWidth = sHeight * targetRatio;
                             sx = (sWidth - new_sWidth) / 2;
                         } else {
-                            // Image is taller than target
                             new_sHeight = sWidth / targetRatio;
                             sy = (sHeight - new_sHeight) / 2;
                         }
                         
-                        // Draw the cropped/zoomed image
                         ctx.drawImage(photo, sx, sy, new_sWidth, new_sHeight, px, py, pw, ph);
-                        // --- END: Smart "Center Crop" Logic ---
                     } else {
                         // Draw white placeholder if photo failed
                         ctx.fillStyle = "white";
@@ -431,17 +848,15 @@
                     ctx.fillStyle = "black";
                     ctx.font = "38px OdiaFont";
                     
-                    // MODIFIED: Format DOB from YYYY-MM-DD to DD/MM/YYYY
                     let formattedDob = student.dob || "";
                     try {
                         const [year, month, day] = student.dob.split('-');
                         formattedDob = `${day}/${month}/${year}`;
-                    } catch(e) { /* fallback to original if parsing fails */ }
+                    } catch(e) { /* fallback */ }
 
                     ctx.fillText(student.name || "", 227, 505 + 38);
                     ctx.fillText(student.class || "", 227, 575 + 38);
-                    // MODIFIED: Use the new formattedDob, and NO toOdia() wrapper
-                    ctx.fillText(formattedDob, 227, 647 + 38); 
+                    ctx.fillText(toOdia(formattedDob), 227, 647 + 38); 
                     ctx.fillText(toOdia(student.roll) || "", 227, 718 + 38);
                     ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
 
@@ -460,7 +875,6 @@
                 }
             });
         }
-
     </script>
 </body>
 </html>
