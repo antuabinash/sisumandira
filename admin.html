@@ -129,7 +129,6 @@
         let db; 
         let idToDelete = null; 
         
-        // --- NEW: Generator variables ---
         let templateImage = null;
         let odiaFont = null;
         const generatorStatus = document.getElementById('generatorStatus');
@@ -138,6 +137,9 @@
         const fontInput = document.getElementById('fontInput');
         const cardCanvas = document.getElementById('cardCanvas');
         const ctx = cardCanvas.getContext('2d');
+        
+        // NEW: Odia Digits for translation
+        const odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
 
 
         try {
@@ -157,6 +159,12 @@
             loadData(db);
             document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
         } catch (e) { alert("Firebase Error: " + e.message); }
+
+        // NEW: Odia translation function
+        function toOdia(text) {
+            if (!text) return "";
+            return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
+        }
 
         function loadData(db) {
             tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
@@ -286,7 +294,7 @@
         });
 
 
-        // --- NEW: ID Card Generator Logic ---
+        // --- ID Card Generator Logic ---
 
         function checkAssetsReady() {
             if (templateImage && odiaFont) {
@@ -368,7 +376,7 @@
         function generateCard(student) {
             return new Promise(async (resolve, reject) => {
                 try {
-                    // 1. Load student photo (or create placeholder)
+                    // 1. Load student photo
                     const photo = new Image();
                     let photoLoaded = false;
                     if (student.photoBase64) {
@@ -383,17 +391,13 @@
                     ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
                     ctx.drawImage(templateImage, 0, 0);
 
-                    // 3. Draw Photo (with border)
-                    // Coordinates from your Python script:
-                    // PHOTO_COORDS = (222, 250), PHOTO_SIZE = (187, 225), BORDER = 3
+                    // 3. Draw Photo
                     const px=222, py=250, pw=187, ph=225, border=3;
-                    
                     if (photoLoaded) {
                         ctx.fillStyle = "black";
                         ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
                         ctx.drawImage(photo, px, py, pw, ph);
                     } else {
-                        // Draw placeholder if photo failed
                         ctx.fillStyle = "black";
                         ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
                         ctx.fillStyle = "white";
@@ -401,18 +405,16 @@
                     }
                     
                     // 4. Draw Text
-                    // Using the adjusted Y coordinates from your script (e.g., NAME_Y_ADJUSTED)
-                    // This sets the font *baseline*, which is what canvas fillText uses
-                    
-                    ctx.textBaseline = 'alphabetic'; // Use the font baseline
+                    ctx.textBaseline = 'alphabetic';
                     ctx.fillStyle = "black";
                     ctx.font = "38px OdiaFont";
                     
+                    // MODIFIED: Use toOdia() for numeric fields
                     ctx.fillText(student.name || "", 227, 505 + 38);
                     ctx.fillText(student.class || "", 227, 575 + 38);
-                    ctx.fillText(student.dob || "", 227, 647 + 38);
-                    ctx.fillText(student.roll || "", 227, 718 + 38);
-                    ctx.fillText(student.phone || "", 227, 789 + 38);
+                    ctx.fillText(toOdia(student.dob) || "", 227, 647 + 38);
+                    ctx.fillText(toOdia(student.roll) || "", 227, 718 + 38);
+                    ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
 
                     // 5. Draw Blood Group (different color/size)
                     if (student.bloodGroup) {
