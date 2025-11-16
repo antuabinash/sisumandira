@@ -1,21 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Admin Panel - Student Data</title>
     <!-- SheetJS & JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    
+
     <!-- Firebase SDKs (Firestore Only) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
-    
-    <!-- Cropper.js Library (for Manual Crop) -->
+
+    <!-- Cropper.js Library (kept - you can remove if not using) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-    
+
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f4f7f6; }
         h1, h2 { color: #0056b3; }
@@ -23,7 +23,7 @@
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
         th { background: #0056b3; color: white; }
         img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
-        
+
         .card {
             max-width: 1000px;
             margin: 0 auto 20px auto;
@@ -37,16 +37,16 @@
         select, button, input[type="file"] { padding: 10px; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; }
         button { background: #28a745; color: white; border: none; cursor: pointer; }
         button:disabled { background: #999; cursor: not-allowed; }
-        
+
         #downloadZipBtn { background: #ffc107; color: #333; }
         .delete-btn, .crop-btn { padding: 5px 8px; font-size: 12px; width: auto; margin-right: 5px; }
         .delete-btn { background-color: #dc3545; color: white; }
-        .crop-btn { background-color: #17a2b8; color: white; } 
-        
+        .crop-btn { background-color: #17a2b8; color: white; }
+
         #generatorStatus { font-style: italic; color: #555; }
         .generator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        #generateBtn { background-color: #007bff; grid-column: 1 / -1; } 
-        
+        #generateBtn { background-color: #007bff; grid-column: 1 / -1; }
+
         /* Modals */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
         .modal-content { background-color: #fff; padding: 20px 30px; border-radius: 8px; text-align: center; max-width: 90vw; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
@@ -71,17 +71,17 @@
 </head>
 <body>
     <h1>Admin Panel: Student Data</h1>
-    
+
     <div class="card">
         <h2>ID Card Generator</h2>
         <div class="generator-grid">
             <div>
                 <label for="templateInput">1. Upload Template (.png)</label>
-                <input type="file" id="templateInput" accept="image/png" style="width:100%;">
+                <input type="file" id="templateInput" accept="image/png" style="width:100%;" />
             </div>
             <div>
                 <label for="fontInput">2. Upload Odia Font (.ttf)</label>
-                <input type="file" id="fontInput" accept=".ttf,.otf,font/ttf,font/otf" style="width:100%;">
+                <input type="file" id="fontInput" accept=".ttf,.otf,font/ttf,font/otf" style="width:100%;" />
             </div>
             <button id="generateBtn" disabled>Generate & Download ID Cards</button>
         </div>
@@ -97,6 +97,8 @@
             </select>
             <button id="refreshBtn">Refresh Data</button>
             <button id="downloadZipBtn">Download Raw Backup (ZIP)</button>
+            <!-- Delete All button -->
+            <button id="deleteAllBtn" class="delete-btn" title="Delete all (filtered) records">Delete All</button>
         </div>
 
         <table id="studentTable">
@@ -121,6 +123,7 @@
 
     <canvas id="cardCanvas" style="display: none;"></canvas>
 
+    <!-- Single-delete confirm modal -->
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <p id="confirmText">Are you sure?</p>
@@ -130,7 +133,19 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Delete All Modal -->
+    <div id="deleteAllModal" class="modal">
+        <div class="modal-content">
+            <p id="deleteAllText">Delete ALL student records?</p>
+            <div class="modal-buttons">
+                <button id="deleteAllYesBtn" style="background-color:#dc3545;color:#fff">Delete</button>
+                <button id="deleteAllNoBtn" style="background-color:#6c757d;color:#fff">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper modal (kept) -->
     <div id="cropModal" class="modal">
         <div class="modal-content">
             <h3>Crop Photo</h3>
@@ -145,302 +160,366 @@
         </div>
     </div>
 
-    <!-- SCRIPT 1: DATA, TABLE, and CROP LOGIC (FAST) -->
-    <script>
-        // --- Asset tracking (global for both scripts) ---
-        window.assets = {
-            template: null,
-            font: null,
-            aiModel: "pending" // 'pending', 'loaded', 'failed'
+<script>
+    // --- Asset tracking (global for both scripts) ---
+    window.assets = {
+        template: null,
+        font: null,
+        aiModel: "pending" // 'pending', 'loaded', 'failed'
+    };
+
+    // --- Global variables ---
+    let allStudents = [];
+    const tableBody = document.querySelector('#studentTable tbody');
+    const schoolFilter = document.getElementById('schoolFilter');
+
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmYesBtn = document.getElementById('confirmYesBtn');
+    const confirmNoBtn = document.getElementById('confirmNoBtn');
+    const confirmText = document.getElementById('confirmText');
+
+    const deleteAllModal = document.getElementById('deleteAllModal');
+    const deleteAllText = document.getElementById('deleteAllText');
+    const deleteAllBtn = document.getElementById('deleteAllBtn');
+    const deleteAllYesBtn = document.getElementById('deleteAllYesBtn');
+    const deleteAllNoBtn = document.getElementById('deleteAllNoBtn');
+
+    const cropModal = document.getElementById('cropModal');
+    const cropImage = document.getElementById('cropImage');
+    const saveCropBtn = document.getElementById('saveCropBtn');
+    const cancelCropBtn = document.getElementById('cancelCropBtn');
+    let cropper = null;
+    let idToCrop = null;
+
+    let db;
+    let idToDelete = null;
+
+    window.allStudents = [];
+    window.db = null;
+    window.schoolFilter = schoolFilter;
+    window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
+
+    // --- Generator UI Elements ---
+    const generatorStatus = document.getElementById('generatorStatus');
+    const generateBtn = document.getElementById('generateBtn');
+    const templateInput = document.getElementById('templateInput');
+    const fontInput = document.getElementById('fontInput');
+
+    try {
+        // YOUR SPECIFIC KEYS EMBEDDED HERE
+        const firebaseConfig = {
+          apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+          authDomain: "idcard-60586.firebaseapp.com",
+          projectId: "idcard-60586",
+          storageBucket: "idcard-60586.firebasestorage.app",
+          messagingSenderId: "331979663377",
+          appId: "1:331979663377:web:026e537a7fcaca813129b0",
+          measurementId: "G-PXVV87C78S"
         };
-        
-        // --- Global variables ---
-        let allStudents = [];
-        const tableBody = document.querySelector('#studentTable tbody');
-        const schoolFilter = document.getElementById('schoolFilter');
-        
-        const confirmModal = document.getElementById('confirmModal');
-        const confirmYesBtn = document.getElementById('confirmYesBtn');
-        const confirmNoBtn = document.getElementById('confirmNoBtn');
-        const confirmText = document.getElementById('confirmText');
-        
-        const cropModal = document.getElementById('cropModal');
-        const cropImage = document.getElementById('cropImage');
-        const saveCropBtn = document.getElementById('saveCropBtn');
-        const cancelCropBtn = document.getElementById('cancelCropBtn');
-        let cropper = null;
-        let idToCrop = null;
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        window.db = db;
 
-        let db; 
-        let idToDelete = null; 
-        
-        window.allStudents = [];
-        window.db = null;
-        window.schoolFilter = schoolFilter;
-        window.odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
-        
-        // --- Generator UI Elements (now in the fast script) ---
-        const generatorStatus = document.getElementById('generatorStatus');
-        const generateBtn = document.getElementById('generateBtn');
-        const templateInput = document.getElementById('templateInput');
-        const fontInput = document.getElementById('fontInput');
-        
-        try {
-            // YOUR SPECIFIC KEYS EMBEDDED HERE
-            const firebaseConfig = {
-              apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
-              authDomain: "idcard-60586.firebaseapp.com",
-              projectId: "idcard-60586",
-              storageBucket: "idcard-60586.firebasestorage.app",
-              messagingSenderId: "331979663377",
-              appId: "1:331979663377:web:026e537a7fcaca813129b0",
-              measurementId: "G-PXVV87C78S"
-            };
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore(); 
-            window.db = db; // Share with module
-            
-            loadData(db);
-            document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
+        loadData(db);
+        document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
 
-        } catch (e) { alert("Firebase Error: " + e.message); }
-        
-        function loadData(db) {
-            tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
-            
-            db.collection("students").get().then((querySnapshot) => {
-                allStudents = [];
-                const schools = new Set();
-                
-                querySnapshot.forEach((doc) => {
-                    const s = doc.data();
-                    allStudents.push(s);
-                    if(s.schoolName) schools.add(s.schoolName);
-                });
-                
-                // Sort in JavaScript, not in the query
-                allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
-                window.allStudents = allStudents; // Share with module
+    } catch (e) { alert("Firebase Error: " + e.message); }
 
-                schoolFilter.innerHTML = '<option value="all">All Schools</option>';
-                schools.forEach(school => {
-                    const opt = document.createElement('option');
-                    opt.value = school;
-                    opt.textContent = school;
-                    schoolFilter.appendChild(opt);
-                });
-                
-                renderTable(allStudents);
-            }).catch((error) => {
-                console.log("Error getting documents: ", error);
-                tableBody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
+    function loadData(dbInstance) {
+        tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
+
+        dbInstance.collection("students").get().then((querySnapshot) => {
+            allStudents = [];
+            const schools = new Set();
+
+            querySnapshot.forEach((doc) => {
+                const s = doc.data();
+                allStudents.push(s);
+                if (s.schoolName) schools.add(s.schoolName);
             });
-        }
 
-        function renderTable(data) {
-            tableBody.innerHTML = '';
-            if (data.length === 0) {
-                 tableBody.innerHTML = '<tr><td colspan="9">No data found.</td></tr>';
-                 return;
-            }
-            data.forEach(s => {
-                const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
-                const row = `<tr>
-                    <td><img src="${photoSrc}" id="img-${s.id}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
-                    <td>${s.name}</td>
-                    <td>${s.class}</td>
-                    <td>${s.roll}</td>
-                    <td>${s.dob}</td>
-                    <td>${s.bloodGroup || '-'}</td>
-                    <td>${s.phone || '-'}</td>
-                    <td>${s.schoolName}</td>
-                    <td>
-                        <button class="crop-btn" data-id="${s.id}">Manual Crop</button>
-                        <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
-                    </td>
-                </tr>`;
-                tableBody.innerHTML += row;
+            // Sort
+            allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
+            window.allStudents = allStudents;
+
+            // populate filter
+            schoolFilter.innerHTML = '<option value="all">All Schools</option>';
+            schools.forEach(school => {
+                const opt = document.createElement('option');
+                opt.value = school;
+                opt.textContent = school;
+                schoolFilter.appendChild(opt);
             });
+
+            renderTable(allStudents);
+            updateDeleteButton();
+        }).catch((error) => {
+            console.log("Error getting documents: ", error);
+            tableBody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
+            updateDeleteButton();
+        });
+    }
+
+    function renderTable(data) {
+        tableBody.innerHTML = '';
+        if (data.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="9">No data found.</td></tr>';
+            return;
         }
-        
-        schoolFilter.addEventListener('change', () => {
-            const val = schoolFilter.value;
-            if (val === 'all') renderTable(allStudents);
-            else renderTable(allStudents.filter(s => s.schoolName === val));
+        data.forEach(s => {
+            const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
+            const row = `<tr>
+                <td><img src="${photoSrc}" id="img-${s.id}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
+                <td>${s.name}</td>
+                <td>${s.class}</td>
+                <td>${s.roll}</td>
+                <td>${s.dob}</td>
+                <td>${s.bloodGroup || '-'}</td>
+                <td>${s.phone || '-'}</td>
+                <td>${s.schoolName}</td>
+                <td>
+                    <button class="crop-btn" data-id="${s.id}">Manual Crop</button>
+                    <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
+                </td>
+            </tr>`;
+            tableBody.innerHTML += row;
         });
+    }
 
-        // --- Delete & Crop Logic ---
-        tableBody.addEventListener('click', (e) => {
-            if (e.target.classList.contains('delete-btn')) {
-                idToDelete = e.target.dataset.id;
-                const name = e.target.dataset.name || 'this student';
-                confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
-                confirmModal.style.display = 'flex';
-            }
-            if (e.target.classList.contains('crop-btn')) {
-                idToCrop = e.target.dataset.id;
-                const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student && student.photoBase64) {
-                    openCropper(student.photoBase64);
-                } else {
-                    alert("No photo found for this student to crop.");
-                }
-            }
-        });
+    schoolFilter.addEventListener('change', () => {
+        const val = schoolFilter.value;
+        if (val === 'all') renderTable(allStudents);
+        else renderTable(allStudents.filter(s => s.schoolName === val));
+        updateDeleteButton();
+    });
 
-        confirmNoBtn.addEventListener('click', () => {
-            confirmModal.style.display = 'none';
-            idToDelete = null;
-        });
-
-        confirmYesBtn.addEventListener('click', () => {
-            if (idToDelete) {
-                deleteStudent(idToDelete);
-            }
-            confirmModal.style.display = 'none';
-            idToDelete = null;
-        });
-
-        function deleteStudent(id) {
-            if (!db) return;
-            db.collection("students").doc(id.toString()).delete()
-                .then(() => {
-                    allStudents = allStudents.filter(s => s.id.toString() !== id);
-                    window.allStudents = allStudents; // Update global
-                    const val = schoolFilter.value;
-                    if (val === 'all') renderTable(allStudents);
-                    else renderTable(allStudents.filter(s => s.schoolName === val));
-                }).catch(console.error);
+    // --- Delete & Crop Logic ---
+    tableBody.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-btn')) {
+            idToDelete = e.target.dataset.id;
+            const name = e.target.dataset.name || 'this student';
+            confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
+            confirmModal.style.display = 'flex';
         }
-        
-        // --- Manual Cropper.js Functions ---
-        
-        function openCropper(base64Image) {
-            if (cropper) cropper.destroy();
-            cropImage.src = base64Image;
-            cropModal.style.display = 'flex';
-            cropper = new Cropper(cropImage, { aspectRatio: 187 / 225, viewMode: 1, dragMode: 'move', autoCropArea: 0.8, movable: true, zoomable: true, rotatable: false, scalable: false });
-        }
-        cancelCropBtn.addEventListener('click', () => { cropModal.style.display = 'none'; if (cropper) cropper.destroy(); cropper = null; idToCrop = null; });
-        saveCropBtn.addEventListener('click', () => {
-            if (!cropper || !idToCrop) return;
-            saveCropBtn.disabled = true; saveCropBtn.textContent = "Saving...";
-            const croppedCanvas = cropper.getCroppedCanvas({ width: 187, height: 225, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
-            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); 
-            db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 })
-            .then(() => {
-                const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student) student.photoBase64 = newBase64;
-                const tableImg = document.getElementById(`img-${idToCrop}`);
-                if (tableImg) tableImg.src = newBase64;
-                saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop";
-                cancelCropBtn.click();
-            })
-            .catch((err) => { alert("Error saving crop: " + err.message); saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop"; });
-        });
-
-        // --- Raw ZIP Download Logic ---
-        document.getElementById('downloadZipBtn').addEventListener('click', async () => {
-            if(allStudents.length === 0) return alert("No data");
-            const btn = document.getElementById('downloadZipBtn');
-            btn.disabled = true; btn.textContent = "Generating Zip...";
-            
-            const val = schoolFilter.value;
-            const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
-            
-            try {
-                const zip = new JSZip();
-                dataToExport.forEach(s => {
-                    if(s.photoBase64) {
-                        // ensure filename safe
-                        const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\/\:\*\?\"<>\|]/g,'_');
-                        zip.file(fname, s.photoBase64.split(',')[1], {base64: true});
-                    }
-                });
-                
-                const excelData = dataToExport.map(s => {
-                    let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
-                    return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: (s.newPhotoName||'') };
-                });
-                const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
-                const wb = XLSX.utils.book_new(); 
-                let sheetName = (val === 'all' ? 'All_Schools' : val).replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
-                XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                zip.file('student_data.xlsx', excelBlob);
-
-                const zipBlob = await zip.generateAsync({ type: 'blob' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(zipBlob);
-                link.download = `${sheetName}_Backup.zip`;
-                link.click();
-            } catch(e) {
-                console.error(e);
-                alert("Error creating zip: " + e.message);
-            } finally {
-                btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
-            }
-        });
-
-        // --- NEW: Smart Status Logic (in fast script) ---
-        function updateStatus() {
-            const templateStatus = window.assets.template ? '✅ Template' : '❌ Template';
-            const fontStatus = window.assets.font ? '✅ Font' : '❌ Font';
-            let aiStatus = '⏳ AI Model...';
-            if (window.assets.aiModel === "loaded") aiStatus = '✅ AI Model';
-            if (window.assets.aiModel === "failed") aiStatus = '⚠️ AI (Fallback)';
-
-            generatorStatus.textContent = `Status: ${templateStatus}, ${fontStatus}, ${aiStatus}`;
-
-            if (window.assets.template && window.assets.font && (window.assets.aiModel === "loaded" || window.assets.aiModel === "failed")) {
-                generateBtn.disabled = false;
-                generatorStatus.textContent = `✅ Ready. You can now generate ID cards.`;
+        if (e.target.classList.contains('crop-btn')) {
+            idToCrop = e.target.dataset.id;
+            const student = allStudents.find(s => s.id.toString() === idToCrop);
+            if (student && student.photoBase64) {
+                openCropper(student.photoBase64);
             } else {
-                generateBtn.disabled = true;
+                alert("No photo found for this student to crop.");
             }
         }
-        // Run update on load
-        updateStatus();
-        window.updateStatus = updateStatus; // Make global
+    });
 
-        templateInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                window.assets.template = new Image();
-                window.assets.template.src = URL.createObjectURL(file);
-                window.assets.template.onload = () => {
-                    const canvas = document.getElementById('cardCanvas');
-                    canvas.width = window.assets.template.width;
-                    canvas.height = window.assets.template.height;
-                    console.log("Template Loaded");
-                    updateStatus();
-                };
-            }
-        });
+    confirmNoBtn.addEventListener('click', () => {
+        confirmModal.style.display = 'none';
+        idToDelete = null;
+    });
 
-        fontInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    const fontData = await file.arrayBuffer();
-                    // using FontFace with binary content
-                    window.assets.font = new FontFace('OdiaFont', fontData);
-                    document.fonts.add(window.assets.font);
-                    await window.assets.font.load();
-                    console.log("Font Loaded");
-                    updateStatus();
-                } catch (err) {
-                    console.error("Font load error:", err);
-                    generatorStatus.textContent = "Error loading font file.";
+    confirmYesBtn.addEventListener('click', () => {
+        if (idToDelete) {
+            deleteStudent(idToDelete);
+        }
+        confirmModal.style.display = 'none';
+        idToDelete = null;
+    });
+
+    function deleteStudent(id) {
+        if (!db) return;
+        db.collection("students").doc(id.toString()).delete()
+            .then(() => {
+                allStudents = allStudents.filter(s => s.id.toString() !== id);
+                window.allStudents = allStudents;
+                const val = schoolFilter.value;
+                if (val === 'all') renderTable(allStudents);
+                else renderTable(allStudents.filter(s => s.schoolName === val));
+                updateDeleteButton();
+            }).catch(console.error);
+    }
+
+    // --- Manual Cropper (kept) ---
+    function openCropper(base64Image) {
+        if (cropper) cropper.destroy();
+        cropImage.src = base64Image;
+        cropModal.style.display = 'flex';
+        cropper = new Cropper(cropImage, { aspectRatio: 187 / 225, viewMode: 1, dragMode: 'move', autoCropArea: 0.8, movable: true, zoomable: true, rotatable: false, scalable: false });
+    }
+    cancelCropBtn.addEventListener('click', () => { cropModal.style.display = 'none'; if (cropper) cropper.destroy(); cropper = null; idToCrop = null; });
+    saveCropBtn.addEventListener('click', () => {
+        if (!cropper || !idToCrop) return;
+        saveCropBtn.disabled = true; saveCropBtn.textContent = "Saving...";
+        const croppedCanvas = cropper.getCroppedCanvas({ width: 187, height: 225, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+        const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9);
+        db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 })
+        .then(() => {
+            const student = allStudents.find(s => s.id.toString() === idToCrop);
+            if (student) student.photoBase64 = newBase64;
+            const tableImg = document.getElementById(`img-${idToCrop}`);
+            if (tableImg) tableImg.src = newBase64;
+            saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop";
+            cancelCropBtn.click();
+        })
+        .catch((err) => { alert("Error saving crop: " + err.message); saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop"; });
+    });
+
+    // --- Raw ZIP Download Logic ---
+    document.getElementById('downloadZipBtn').addEventListener('click', async () => {
+        if(allStudents.length === 0) return alert("No data");
+        const btn = document.getElementById('downloadZipBtn');
+        btn.disabled = true; btn.textContent = "Generating Zip...";
+
+        const val = schoolFilter.value;
+        const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+
+        try {
+            const zip = new JSZip();
+            dataToExport.forEach(s => {
+                if(s.photoBase64) {
+                    const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\/\:\*\?\"<>\|]/g,'_');
+                    zip.file(fname, s.photoBase64.split(',')[1], {base64: true});
                 }
+            });
+
+            const excelData = dataToExport.map(s => {
+                let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
+                return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: (s.newPhotoName||'') };
+            });
+            const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
+            const wb = XLSX.utils.book_new();
+            let sheetName = (val === 'all' ? 'All_Schools' : val).replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            zip.file('student_data.xlsx', excelBlob);
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `${sheetName}_Backup.zip`;
+            link.click();
+        } catch(e) {
+            console.error(e);
+            alert("Error creating zip: " + e.message);
+        } finally {
+            btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
+        }
+    });
+
+    // --- DELETE ALL (Filtered) Logic ---
+    deleteAllBtn.addEventListener('click', () => {
+        const val = schoolFilter.value;
+        if (val === 'all') {
+            deleteAllText.textContent = 'Delete ALL student records from the database? This cannot be undone.';
+        } else {
+            deleteAllText.textContent = `Delete ALL student records for "${val}"? This cannot be undone.`;
+        }
+        deleteAllModal.style.display = 'flex';
+    });
+
+    deleteAllNoBtn.addEventListener('click', () => { deleteAllModal.style.display = 'none'; });
+
+    deleteAllYesBtn.addEventListener('click', async () => {
+        deleteAllModal.style.display = 'none';
+        const val = schoolFilter.value;
+        try {
+            // confirm once more with browser confirm (optional extra safety)
+            const ok = confirm('This will permanently delete the selected records. Proceed?');
+            if (!ok) return;
+            await deleteAllStudents(val);
+            alert('Delete operation completed. Refreshing list.');
+            loadData(db);
+        } catch (err) {
+            console.error('Delete all failed', err);
+            alert('Delete failed: ' + (err && err.message ? err.message : err));
+        }
+    });
+
+    // Delete helper (batching in chunks under Firestore limit)
+    async function deleteAllStudents(filterSchool) {
+        if (!db) throw new Error('Firestore not initialized');
+        let query = db.collection('students');
+        if (filterSchool && filterSchool !== 'all') query = query.where('schoolName', '==', filterSchool);
+
+        const snapshot = await query.get();
+        if (snapshot.empty) return;
+
+        const docs = snapshot.docs;
+        const chunkSize = 400; // keep under 500 to be safe
+        for (let i = 0; i < docs.length; i += chunkSize) {
+            const batch = db.batch();
+            const chunk = docs.slice(i, i + chunkSize);
+            chunk.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+    }
+
+    // --- Smart Status Logic ---
+    function updateStatus() {
+        const templateStatus = window.assets.template ? '✅ Template' : '❌ Template';
+        const fontStatus = window.assets.font ? '✅ Font' : '❌ Font';
+        let aiStatus = '⏳ AI Model...';
+        if (window.assets.aiModel === "loaded") aiStatus = '✅ AI Model';
+        if (window.assets.aiModel === "failed") aiStatus = '⚠️ AI (Fallback)';
+
+        generatorStatus.textContent = `Status: ${templateStatus}, ${fontStatus}, ${aiStatus}`;
+
+        if (window.assets.template && window.assets.font && (window.assets.aiModel === "loaded" || window.assets.aiModel === "failed")) {
+            generateBtn.disabled = false;
+            generatorStatus.textContent = `✅ Ready. You can now generate ID cards.`;
+        } else {
+            generateBtn.disabled = true;
+        }
+    }
+    window.updateStatus = updateStatus;
+    updateStatus();
+
+    // disable/enable deleteAll button depending on data
+    function updateDeleteButton() {
+        try {
+            const hasData = Array.isArray(window.allStudents) && window.allStudents.length > 0;
+            deleteAllBtn.disabled = !hasData;
+        } catch (e) {
+            deleteAllBtn.disabled = true;
+        }
+    }
+
+    // template & font changes
+    templateInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            window.assets.template = new Image();
+            window.assets.template.src = URL.createObjectURL(file);
+            window.assets.template.onload = () => {
+                const canvas = document.getElementById('cardCanvas');
+                canvas.width = window.assets.template.width;
+                canvas.height = window.assets.template.height;
+                console.log("Template Loaded");
+                updateStatus();
+            };
+        }
+    });
+
+    fontInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const fontData = await file.arrayBuffer();
+                window.assets.font = new FontFace('OdiaFont', fontData);
+                document.fonts.add(window.assets.font);
+                await window.assets.font.load();
+                console.log("Font Loaded");
+                updateStatus();
+            } catch (err) {
+                console.error("Font load error:", err);
+                generatorStatus.textContent = "Error loading font file.";
             }
-        });
-    </script>
-    
-    <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE - SLOW) -->
-    <script type="module">
+        }
+    });
+</script>
+
+<!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE - SLOW) -->
+<script type="module">
     // Use the ESM bundle and wasm folder from jsDelivr which exposes the .mjs and wasm folder reliably
-    // If you prefer another CDN, replace the URLs but keep the .mjs and wasm paths consistent.
     async function loadVisionBundle() {
       try {
         const bundleUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
@@ -460,24 +539,19 @@
       FaceDetector = mod.FaceDetector;
       FilesetResolver = mod.FilesetResolver;
     } catch (err) {
-      // mark model as failed and continue — we have center-crop fallback
       console.warn('Mediapipe import failed; generator will use center-crop fallback.');
       window.assets.aiModel = 'failed';
       window.updateStatus();
     }
 
-    // Get global variables from Script 1
     const generateBtn = document.getElementById('generateBtn');
     const cardCanvas = document.getElementById('cardCanvas');
     const ctx = cardCanvas.getContext('2d');
-    const generatorStatus = document.getElementById('generatorStatus');
 
     if (FilesetResolver && FaceDetector) initializeFaceDetector();
 
-    // --- AI Face Detector Setup ---
     async function initializeFaceDetector() {
         try {
-            // point to wasm folder on same CDN
             const wasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
             const filesetResolver = await FilesetResolver.forVisionTasks(wasmUrl);
 
@@ -519,7 +593,7 @@
 
         for (const student of dataToGenerate) {
             try {
-                const cardBlob = await generateCard(student); 
+                const cardBlob = await generateCard(student);
                 const filename = `${(student.name||'student').replace(/\s+/g, '_')}_${student.roll||''}.png`;
                 zip.file(filename, cardBlob);
                 count++;
@@ -545,7 +619,6 @@
     function generateCard(student) {
         return new Promise(async (resolve, reject) => {
             try {
-                // 1. Load student photo
                 const photo = new Image();
                 let photoLoaded = false;
                 if (student.photoBase64) {
@@ -556,11 +629,9 @@
                     });
                 }
 
-                // 2. Draw template
                 ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
                 ctx.drawImage(window.assets.template, 0, 0);
 
-                // 3. Draw Photo
                 const px=222, py=250, pw=187, ph=225, border=3;
                 ctx.fillStyle = "black";
                 ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
@@ -571,21 +642,19 @@
                     try {
                         const detections = faceDetector.detect(photo);
                         if (detections && detections.detections && detections.detections.length > 0) {
-                            // Smart AI Crop
                             const bbox = detections.detections[0].boundingBox;
                             const img_w = photo.width, img_h = photo.height;
                             let x1 = bbox.originX, y1 = bbox.originY;
                             let x2 = bbox.originX + bbox.width, y2 = bbox.originY + bbox.height;
                             const bw = x2 - x1, bh = y2 - y1;
-                            const add_w = parseInt(bw * 0.6); 
-                            const add_h = parseInt(bh * 1.4); 
+                            const add_w = parseInt(bw * 0.6);
+                            const add_h = parseInt(bh * 1.4);
                             const new_x1 = Math.max(0, x1 - add_w / 2);
-                            const new_y1 = Math.max(0, y1 - add_h / 2); 
+                            const new_y1 = Math.max(0, y1 - add_h / 2);
                             const new_x2 = Math.min(img_w, x2 + add_w / 2);
                             const new_y2 = Math.min(img_h, y2 + add_h / 2);
                             sx = new_x1; sy = new_y1; sWidth = new_x2 - new_x1; sHeight = new_y2 - new_y1;
                         } else {
-                            // Fallback 1: No face found, use Center Crop
                             const targetRatio = pw / ph;
                             const srcRatio = sWidth / sHeight;
                             if (srcRatio > targetRatio) {
@@ -609,7 +678,6 @@
                         }
                     }
                 } else if (photoLoaded) {
-                    // Fallback 2: AI failed to load, use Center Crop
                     const targetRatio = pw / ph;
                     const srcRatio = sWidth / sHeight;
                     if (srcRatio > targetRatio) {
@@ -620,48 +688,42 @@
                         sy = (photo.height - sHeight) / 2;
                     }
                 }
-                
+
                 if(photoLoaded) {
                     ctx.drawImage(photo, sx, sy, sWidth, sHeight, px, py, pw, ph);
                 } else {
-                    // Draw white placeholder
                     ctx.fillStyle = "white";
                     ctx.fillRect(px, py, pw, ph);
                 }
-                
-                // 4. Draw Text
+
                 ctx.textBaseline = 'alphabetic';
                 ctx.fillStyle = "black";
                 ctx.font = "38px OdiaFont";
-                
+
                 let formattedDob = student.dob || "";
                 try {
                     const [year, month, day] = (student.dob||'').split('-');
                     if (year && month && day) formattedDob = `${day}/${month}/${year}`;
-                } catch(e) { /* fallback */ }
+                } catch(e) {}
 
-                // Apply Odia numbers to all numeric fields
                 ctx.fillText(student.name || "", 227, 505 + 38);
                 ctx.fillText(student.class || "", 227, 575 + 38);
-                ctx.fillText(toOdia(formattedDob), 227, 647 + 38); 
+                ctx.fillText(toOdia(formattedDob), 227, 647 + 38);
                 ctx.fillText(toOdia(student.roll) || "", 227, 718 + 38);
                 ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
 
-                // 5. Draw Blood Group (different color/size)
                 if (student.bloodGroup) {
                     ctx.fillStyle = "white";
                     ctx.font = "23px OdiaFont";
                     ctx.fillText(student.bloodGroup, 480, 360 + 23);
                 }
-                
-                // 6. Resolve with the final image blob
-                cardCanvas.toBlob(resolve, 'image/png');
 
+                cardCanvas.toBlob(resolve, 'image/png');
             } catch (err) {
                 reject(err);
             }
         });
     }
-    </script>
+</script>
 </body>
 </html>
