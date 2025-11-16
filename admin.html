@@ -377,7 +377,17 @@
             return new Promise(async (resolve, reject) => {
                 try {
                     // 1. Load student photo
-// ... existing code ... -->
+                    const photo = new Image();
+                    let photoLoaded = false;
+                    if (student.photoBase64) {
+                        photo.src = student.photoBase64;
+                        await new Promise((res, rej) => {
+                            photo.onload = () => { photoLoaded = true; res(); };
+                            photo.onerror = rej;
+                        });
+                    }
+
+                    // 2. Draw template
                     ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
                     ctx.drawImage(templateImage, 0, 0);
 
@@ -417,7 +427,7 @@
                     }
                     
                     // 4. Draw Text
-// ... existing code ... -->
+                    ctx.textBaseline = 'alphabetic';
                     ctx.fillStyle = "black";
                     ctx.font = "38px OdiaFont";
                     
@@ -436,4 +446,21 @@
                     ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
 
                     // 5. Draw Blood Group (different color/size)
-// ... existing code ... -->
+                    if (student.bloodGroup) {
+                        ctx.fillStyle = "white";
+                        ctx.font = "23px OdiaFont";
+                        ctx.fillText(student.bloodGroup, 480, 360 + 23);
+                    }
+                    
+                    // 6. Resolve with the final image blob
+                    cardCanvas.toBlob(resolve, 'image/png');
+
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
