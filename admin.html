@@ -79,7 +79,7 @@
             </div>
             <button id="generateBtn" disabled>Generate & Download ID Cards</button>
         </div>
-        <!-- UPDATED: Smart status bar -->
+        <!-- Smart status bar -->
         <p id="generatorStatus">Status: ❌ Template, ❌ Font, ⏳ AI Model...</p>
     </div>
 
@@ -141,6 +141,14 @@
 
     <!-- SCRIPT 1: DATA, TABLE, and CROP LOGIC (FAST) -->
     <script>
+        // --- Asset tracking (global for both scripts) ---
+        window.assets = {
+            template: null,
+            font: null,
+            aiModel: "pending" // 'pending', 'loaded', 'failed'
+        };
+        
+        // --- Global variables ---
         let allStudents = [];
         const tableBody = document.querySelector('#studentTable tbody');
         const schoolFilter = document.getElementById('schoolFilter');
@@ -160,11 +168,16 @@
         let db; 
         let idToDelete = null; 
         
-        // Make these global so the module script can see them
         window.allStudents = [];
         window.db = null;
         window.schoolFilter = schoolFilter;
         window.odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
+        
+        // --- Generator UI Elements (now in the fast script) ---
+        const generatorStatus = document.getElementById('generatorStatus');
+        const generateBtn = document.getElementById('generateBtn');
+        const templateInput = document.getElementById('templateInput');
+        const fontInput = document.getElementById('fontInput');
         
         try {
             // YOUR SPECIFIC KEYS EMBEDDED HERE
@@ -189,7 +202,6 @@
         function loadData(db) {
             tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
             
-            // FIXED: Removed .orderBy() to prevent index error
             db.collection("students").get().then((querySnapshot) => {
                 allStudents = [];
                 const schools = new Set();
@@ -200,7 +212,6 @@
                     if(s.schoolName) schools.add(s.schoolName);
                 });
                 
-                // FIXED: Sort in JavaScript, not in the query
                 allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
                 window.allStudents = allStudents; // Share with module
 
@@ -361,34 +372,77 @@
                 btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
             }
         });
+
+        // --- NEW: Smart Status Logic (in fast script) ---
+        function updateStatus() {
+            const templateStatus = window.assets.template ? '✅ Template' : '❌ Template';
+            const fontStatus = window.assets.font ? '✅ Font' : '❌ Font';
+            let aiStatus = '⏳ AI Model...';
+            if (window.assets.aiModel === "loaded") aiStatus = '✅ AI Model';
+            if (window.assets.aiModel === "failed") aiStatus = '⚠️ AI (Fallback)';
+
+            generatorStatus.textContent = `Status: ${templateStatus}, ${fontStatus}, ${aiStatus}`;
+
+            if (window.assets.template && window.assets.font && (window.assets.aiModel === "loaded" || window.assets.aiModel === "failed")) {
+                generateBtn.disabled = false;
+                generatorStatus.textContent = `✅ Ready. You can now generate ID cards.`;
+            } else {
+                generateBtn.disabled = true;
+            }
+        }
+        // Run update on load
+        updateStatus();
+        window.updateStatus = updateStatus; // Make global
+
+        templateInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                window.assets.template = new Image();
+                window.assets.template.src = URL.createObjectURL(file);
+                window.assets.template.onload = () => {
+                    const canvas = document.getElementById('cardCanvas');
+                    canvas.width = window.assets.template.width;
+                    canvas.height = window.assets.template.height;
+                    console.log("Template Loaded");
+                    updateStatus();
+                };
+            }
+        });
+
+        fontInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    const fontData = await file.arrayBuffer();
+                    window.assets.font = new FontFace('OdiaFont', fontData);
+                    document.fonts.add(window.assets.font);
+                    await window.assets.font.load();
+                    console.log("Font Loaded");
+                    updateStatus();
+                } catch (err) {
+                    console.error("Font load error:", err);
+                    generatorStatus.textContent = "Error loading font file.";
+                }
+            }
+        });
     </script>
     
-    <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE) -->
+    <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE - SLOW) -->
     <script type="module">
         // Import AI classes
         const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
         let faceDetector;
         
         // Get global variables from Script 1
-        const generatorStatus = document.getElementById('generatorStatus');
         const generateBtn = document.getElementById('generateBtn');
-        const templateInput = document.getElementById('templateInput');
-        const fontInput = document.getElementById('fontInput');
         const cardCanvas = document.getElementById('cardCanvas');
         const ctx = cardCanvas.getContext('2d');
-        
-        // Asset tracking object
-        const assets = {
-            template: null,
-            font: null,
-            aiModel: "pending" // 'pending', 'loaded', 'failed'
-        };
+        const generatorStatus = document.getElementById('generatorStatus');
         
         initializeFaceDetector();
         
         // --- AI Face Detector Setup ---
         async function initializeFaceDetector() {
-            updateStatus();
             try {
                 const filesetResolver = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
@@ -401,14 +455,13 @@
                     minDetectionConfidence: 0.5,
                     runningMode: "IMAGE"
                 });
-                assets.aiModel = "loaded";
+                window.assets.aiModel = "loaded";
                 console.log("AI Model Loaded");
-                updateStatus();
+                window.updateStatus();
             } catch (e) {
                 console.error("Failed to load AI Model:", e);
-                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fallback to center-crop.";
-                assets.aiModel = "failed"; // Mark as failed but ready
-                updateStatus(); 
+                window.assets.aiModel = "failed"; // Mark as failed but ready
+                window.updateStatus();
             }
         }
         
@@ -417,58 +470,9 @@
             return text.toString().replace(/\d/g, digit => window.odiaDigits[digit]);
         }
         
-        // --- UPDATED: Smart checklist status ---
-        function updateStatus() {
-            const templateStatus = assets.template ? '✅ Template' : '❌ Template';
-            const fontStatus = assets.font ? '✅ Font' : '❌ Font';
-            let aiStatus = '⏳ AI Model...';
-            if (assets.aiModel === "loaded") aiStatus = '✅ AI Model';
-            if (assets.aiModel === "failed") aiStatus = '⚠️ AI (Fallback)';
-
-            generatorStatus.textContent = `Status: ${templateStatus}, ${fontStatus}, ${aiStatus}`;
-
-            if (assets.template && assets.font && (assets.aiModel === "loaded" || assets.aiModel === "failed")) {
-                generateBtn.disabled = false;
-                generatorStatus.textContent = `✅ Ready. You can now generate ID cards.`;
-            } else {
-                generateBtn.disabled = true;
-            }
-        }
-
-        templateInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                assets.template = new Image();
-                assets.template.src = URL.createObjectURL(file);
-                assets.template.onload = () => {
-                    cardCanvas.width = assets.template.width;
-                    cardCanvas.height = assets.template.height;
-                    console.log("Template Loaded");
-                    updateStatus();
-                };
-            }
-        });
-
-        fontInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    const fontData = await file.arrayBuffer();
-                    assets.font = new FontFace('OdiaFont', fontData);
-                    document.fonts.add(assets.font);
-                    await assets.font.load();
-                    console.log("Font Loaded");
-                    updateStatus();
-                } catch (err) {
-                    console.error("Font load error:", err);
-                    generatorStatus.textContent = "Error loading font file.";
-                }
-            }
-        });
-
         generateBtn.addEventListener('click', async () => {
-            if (!assets.template || !assets.font) { alert("Please upload both template and font files."); return; }
-            if (assets.aiModel === "pending") { alert("AI Face Detector is not ready. Please wait."); return; }
+            if (!window.assets.template || !window.assets.font) { alert("Please upload both template and font files."); return; }
+            if (window.assets.aiModel === "pending") { alert("AI Face Detector is not ready. Please wait."); return; }
 
             generatorStatus.textContent = "Starting generation... (This may take a while)";
             generateBtn.disabled = true;
@@ -519,7 +523,7 @@
 
                     // 2. Draw template
                     ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
-                    ctx.drawImage(assets.template, 0, 0);
+                    ctx.drawImage(window.assets.template, 0, 0);
 
                     // 3. Draw Photo
                     const px=222, py=250, pw=187, ph=225, border=3;
@@ -528,7 +532,7 @@
 
                     let sx=0, sy=0, sWidth=photo.width, sHeight=photo.height;
 
-                    if (photoLoaded && faceDetector && assets.aiModel === "loaded") {
+                    if (photoLoaded && faceDetector && window.assets.aiModel === "loaded") {
                         const detections = faceDetector.detect(photo);
                         
                         if (detections.detections.length > 0) {
