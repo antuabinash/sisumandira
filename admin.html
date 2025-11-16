@@ -61,6 +61,12 @@
         #cropImageContainer img { max-width: 100%; }
         #saveCropBtn { background-color: #28a745; color: white; }
         #cancelCropBtn { background-color: #6c757d; color: white; }
+
+        /* small responsive tweaks */
+        @media (max-width: 720px) {
+          .generator-grid { grid-template-columns: 1fr; }
+          table { font-size: 13px; }
+        }
     </style>
 </head>
 <body>
@@ -346,13 +352,15 @@
                 const zip = new JSZip();
                 dataToExport.forEach(s => {
                     if(s.photoBase64) {
-                        zip.file(s.newPhotoName, s.photoBase64.split(',')[1], {base64: true});
+                        // ensure filename safe
+                        const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\/\:\*\?\"<>\|]/g,'_');
+                        zip.file(fname, s.photoBase64.split(',')[1], {base64: true});
                     }
                 });
                 
                 const excelData = dataToExport.map(s => {
                     let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
-                    return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
+                    return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: (s.newPhotoName||'') };
                 });
                 const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
                 const wb = XLSX.utils.book_new(); 
@@ -415,6 +423,7 @@
             if (file) {
                 try {
                     const fontData = await file.arrayBuffer();
+                    // using FontFace with binary content
                     window.assets.font = new FontFace('OdiaFont', fontData);
                     document.fonts.add(window.assets.font);
                     await window.assets.font.load();
@@ -430,115 +439,138 @@
     
     <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE - SLOW) -->
     <script type="module">
-        // ** THE FIX IS HERE - Using unpkg.com **
-        const { FaceDetector, FilesetResolver } = await import("https://unpkg.com/@mediapipe/tasks-vision@0.10.14/web/vision_bundle.js");
-        let faceDetector;
-        
-        // Get global variables from Script 1
-        const generateBtn = document.getElementById('generateBtn');
-        const cardCanvas = document.getElementById('cardCanvas');
-        const ctx = cardCanvas.getContext('2d');
-        const generatorStatus = document.getElementById('generatorStatus');
-        
-        initializeFaceDetector();
-        
-        // --- AI Face Detector Setup ---
-        async function initializeFaceDetector() {
+    // Use the ESM bundle and wasm folder from jsDelivr which exposes the .mjs and wasm folder reliably
+    // If you prefer another CDN, replace the URLs but keep the .mjs and wasm paths consistent.
+    async function loadVisionBundle() {
+      try {
+        const bundleUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+        const mod = await import(bundleUrl);
+        return mod;
+      } catch (err) {
+        console.error('Vision bundle import failed:', err);
+        throw err;
+      }
+    }
+
+    let FaceDetector, FilesetResolver;
+    let faceDetector = null;
+
+    try {
+      const mod = await loadVisionBundle();
+      FaceDetector = mod.FaceDetector;
+      FilesetResolver = mod.FilesetResolver;
+    } catch (err) {
+      // mark model as failed and continue — we have center-crop fallback
+      console.warn('Mediapipe import failed; generator will use center-crop fallback.');
+      window.assets.aiModel = 'failed';
+      window.updateStatus();
+    }
+
+    // Get global variables from Script 1
+    const generateBtn = document.getElementById('generateBtn');
+    const cardCanvas = document.getElementById('cardCanvas');
+    const ctx = cardCanvas.getContext('2d');
+    const generatorStatus = document.getElementById('generatorStatus');
+
+    if (FilesetResolver && FaceDetector) initializeFaceDetector();
+
+    // --- AI Face Detector Setup ---
+    async function initializeFaceDetector() {
+        try {
+            // point to wasm folder on same CDN
+            const wasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+            const filesetResolver = await FilesetResolver.forVisionTasks(wasmUrl);
+
+            faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+                    delegate: "GPU"
+                },
+                minDetectionConfidence: 0.5,
+                runningMode: "IMAGE"
+            });
+            window.assets.aiModel = "loaded";
+            console.log("AI Model Loaded");
+            window.updateStatus();
+        } catch (e) {
+            console.error("Failed to load AI Model:", e);
+            alert("INFO: The AI Face Detector failed to load. The generator will use simple 'Center Crop' as a fallback. Error: " + (e && e.message ? e.message : e));
+            window.assets.aiModel = "failed";
+            window.updateStatus();
+        }
+    }
+
+    function toOdia(text) {
+        if (!text) return "";
+        return text.toString().replace(/\d/g, digit => window.odiaDigits[digit]);
+    }
+
+    generateBtn.addEventListener('click', async () => {
+        if (!window.assets.template || !window.assets.font) { alert("Please upload both template and font files."); return; }
+        if (window.assets.aiModel === "pending") { alert("AI Face Detector is not ready. Please wait."); return; }
+
+        generatorStatus.textContent = "Starting generation... (This may take a while)";
+        generateBtn.disabled = true;
+
+        const val = window.schoolFilter.value;
+        const dataToGenerate = (val === 'all') ? window.allStudents : window.allStudents.filter(s => s.schoolName === val);
+        const zip = new JSZip();
+        let count = 0;
+
+        for (const student of dataToGenerate) {
             try {
-                // ** THE FIX IS HERE - Using unpkg.com **
-                const filesetResolver = await FilesetResolver.forVisionTasks(
-                    "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/web/wasm"
-                );
-                faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
-                        delegate: "GPU" // Use GPU on PC
-                    },
-                    minDetectionConfidence: 0.5,
-                    runningMode: "IMAGE"
-                });
-                window.assets.aiModel = "loaded";
-                console.log("AI Model Loaded");
-                window.updateStatus();
-            } catch (e) {
-                console.error("Failed to load AI Model:", e);
-                alert("CRITICAL ERROR: The AI Face Detector failed to load. This can be caused by ad-blockers or network issues. The generator will use simple 'Center Crop' as a fallback. Error: " + e.message);
-                window.assets.aiModel = "failed"; // Mark as failed but ready
-                window.updateStatus();
+                const cardBlob = await generateCard(student); 
+                const filename = `${(student.name||'student').replace(/\s+/g, '_')}_${student.roll||''}.png`;
+                zip.file(filename, cardBlob);
+                count++;
+                generatorStatus.textContent = `Generated card ${count} of ${dataToGenerate.length}...`;
+            } catch (err) {
+                console.error(`Failed to generate card for ${student.name}:`, err);
             }
         }
-        
-        function toOdia(text) {
-            if (!text) return "";
-            return text.toString().replace(/\d/g, digit => window.odiaDigits[digit]);
-        }
-        
-        generateBtn.addEventListener('click', async () => {
-            if (!window.assets.template || !window.assets.font) { alert("Please upload both template and font files."); return; }
-            if (window.assets.aiModel === "pending") { alert("AI Face Detector is not ready. Please wait."); return; }
 
-            generatorStatus.textContent = "Starting generation... (This may take a while)";
-            generateBtn.disabled = true;
+        generatorStatus.textContent = `Zipping ${count} cards...`;
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-            const val = window.schoolFilter.value;
-            const dataToGenerate = (val === 'all') ? window.allStudents : window.allStudents.filter(s => s.schoolName === val);
-            const zip = new JSZip();
-            let count = 0;
+        const link = document.createElement('a');
+        const schoolName = (val === 'all' ? 'All_Schools' : val);
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `ID_Cards_${schoolName}.zip`;
+        link.click();
 
-            for (const student of dataToGenerate) {
-                try {
-                    const cardBlob = await generateCard(student); 
-                    const filename = `${student.name.replace(/ /g, '_')}_${student.roll}.png`;
-                    zip.file(filename, cardBlob);
-                    count++;
-                    generatorStatus.textContent = `Generated card ${count} of ${dataToGenerate.length}...`;
-                } catch (err) {
-                    console.error(`Failed to generate card for ${student.name}:`, err);
+        generatorStatus.textContent = `Done! Generated ${count} cards. Ready for next batch.`;
+        generateBtn.disabled = false;
+    });
+
+    function generateCard(student) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // 1. Load student photo
+                const photo = new Image();
+                let photoLoaded = false;
+                if (student.photoBase64) {
+                    photo.src = student.photoBase64;
+                    await new Promise((res, rej) => {
+                        photo.onload = () => { photoLoaded = true; res(); };
+                        photo.onerror = rej;
+                    });
                 }
-            }
 
-            generatorStatus.textContent = `Zipping ${count} cards...`;
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
+                // 2. Draw template
+                ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
+                ctx.drawImage(window.assets.template, 0, 0);
 
-            const link = document.createElement('a');
-            const schoolName = (val === 'all' ? 'All_Schools' : val);
-            link.href = URL.createObjectURL(zipBlob);
-            link.download = `ID_Cards_${schoolName}.zip`;
-            link.click();
+                // 3. Draw Photo
+                const px=222, py=250, pw=187, ph=225, border=3;
+                ctx.fillStyle = "black";
+                ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
 
-            generatorStatus.textContent = `Done! Generated ${count} cards. Ready for next batch.`;
-            generateBtn.disabled = false;
-        });
+                let sx=0, sy=0, sWidth=photo.width || 1, sHeight=photo.height || 1;
 
-        function generateCard(student) {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    // 1. Load student photo
-                    const photo = new Image();
-                    let photoLoaded = false;
-                    if (student.photoBase64) {
-                        photo.src = student.photoBase64;
-                        await new Promise((res, rej) => {
-                            photo.onload = () => { photoLoaded = true; res(); };
-                            photo.onerror = rej;
-                        });
-                    }
-
-                    // 2. Draw template
-                    ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
-                    ctx.drawImage(window.assets.template, 0, 0);
-
-                    // 3. Draw Photo
-                    const px=222, py=250, pw=187, ph=225, border=3;
-                    ctx.fillStyle = "black";
-                    ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
-
-                    let sx=0, sy=0, sWidth=photo.width, sHeight=photo.height;
-
-                    if (photoLoaded && faceDetector && window.assets.aiModel === "loaded") {
+                if (photoLoaded && faceDetector && window.assets.aiModel === "loaded") {
+                    try {
                         const detections = faceDetector.detect(photo);
-                        
-                        if (detections.detections.length > 0) {
+                        if (detections && detections.detections && detections.detections.length > 0) {
                             // Smart AI Crop
                             const bbox = detections.detections[0].boundingBox;
                             const img_w = photo.width, img_h = photo.height;
@@ -564,8 +596,8 @@
                                 sy = (photo.height - sHeight) / 2;
                             }
                         }
-                    } else if (photoLoaded) {
-                        // Fallback 2: AI failed to load, use Center Crop
+                    } catch (e) {
+                        console.warn('Face detection failed for one image, using center crop fallback.', e);
                         const targetRatio = pw / ph;
                         const srcRatio = sWidth / sHeight;
                         if (srcRatio > targetRatio) {
@@ -576,48 +608,60 @@
                             sy = (photo.height - sHeight) / 2;
                         }
                     }
-                    
-                    if(photoLoaded) {
-                        ctx.drawImage(photo, sx, sy, sWidth, sHeight, px, py, pw, ph);
+                } else if (photoLoaded) {
+                    // Fallback 2: AI failed to load, use Center Crop
+                    const targetRatio = pw / ph;
+                    const srcRatio = sWidth / sHeight;
+                    if (srcRatio > targetRatio) {
+                        sWidth = sHeight * targetRatio;
+                        sx = (photo.width - sWidth) / 2;
                     } else {
-                        // Draw white placeholder
-                        ctx.fillStyle = "white";
-                        ctx.fillRect(px, py, pw, ph);
+                        sHeight = sWidth / targetRatio;
+                        sy = (photo.height - sHeight) / 2;
                     }
-                    
-                    // 4. Draw Text
-                    ctx.textBaseline = 'alphabetic';
-                    ctx.fillStyle = "black";
-                    ctx.font = "38px OdiaFont";
-                    
-                    let formattedDob = student.dob || "";
-                    try {
-                        const [year, month, day] = student.dob.split('-');
-                        formattedDob = `${day}/${month}/${year}`;
-                    } catch(e) { /* fallback */ }
-
-                    // Apply Odia numbers to all numeric fields
-                    ctx.fillText(student.name || "", 227, 505 + 38);
-                    ctx.fillText(student.class || "", 227, 575 + 38);
-                    ctx.fillText(toOdia(formattedDob), 227, 647 + 38); 
-                    ctx.fillText(toOdia(student.roll) || "", 227, 718 + 38);
-                    ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
-
-                    // 5. Draw Blood Group (different color/size)
-                    if (student.bloodGroup) {
-                        ctx.fillStyle = "white";
-                        ctx.font = "23px OdiaFont";
-                        ctx.fillText(student.bloodGroup, 480, 360 + 23);
-                    }
-                    
-                    // 6. Resolve with the final image blob
-                    cardCanvas.toBlob(resolve, 'image/png');
-
-                } catch (err) {
-                    reject(err);
                 }
-            });
-        }
+                
+                if(photoLoaded) {
+                    ctx.drawImage(photo, sx, sy, sWidth, sHeight, px, py, pw, ph);
+                } else {
+                    // Draw white placeholder
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(px, py, pw, ph);
+                }
+                
+                // 4. Draw Text
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = "black";
+                ctx.font = "38px OdiaFont";
+                
+                let formattedDob = student.dob || "";
+                try {
+                    const [year, month, day] = (student.dob||'').split('-');
+                    if (year && month && day) formattedDob = `${day}/${month}/${year}`;
+                } catch(e) { /* fallback */ }
+
+                // Apply Odia numbers to all numeric fields
+                ctx.fillText(student.name || "", 227, 505 + 38);
+                ctx.fillText(student.class || "", 227, 575 + 38);
+                ctx.fillText(toOdia(formattedDob), 227, 647 + 38); 
+                ctx.fillText(toOdia(student.roll) || "", 227, 718 + 38);
+                ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
+
+                // 5. Draw Blood Group (different color/size)
+                if (student.bloodGroup) {
+                    ctx.fillStyle = "white";
+                    ctx.font = "23px OdiaFont";
+                    ctx.fillText(student.bloodGroup, 480, 360 + 23);
+                }
+                
+                // 6. Resolve with the final image blob
+                cardCanvas.toBlob(resolve, 'image/png');
+
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
     </script>
 </body>
 </html>
