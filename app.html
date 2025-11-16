@@ -1,425 +1,583 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ID Card Data Entry</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- Firebase SDKs (Firestore Only) -->
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
-    
-    <link rel="manifest" href="manifest.json">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ID Card Data Entry</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f7f6;
-            color: #333;
-        }
-        h1, h3 { text-align: center; }
-        h1 { color: #0056b3; }
-        
-        .card {
-            max-width: 600px;
-            margin: 0 auto 20px auto;
-            padding: 20px;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        
-        #entryForm { display: none; }
+  <!-- Firebase SDKs (Firestore Only) -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
-        div { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; }
-        input, select {
-            width: 100%; padding: 10px; border: 1px solid #ccc;
-            border-radius: 4px; box-sizing: border-box; background-color: #fff;
-        }
-        
-        button {
-            width: 100%; padding: 12px; border: none; border-radius: 4px;
-            cursor: pointer; font-size: 16px; font-weight: 600; margin-top: 10px;
-        }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
-        
-        #addBtn { background-color: #007bff; color: white; }
-        #completeBtn { background-color: #ffc107; color: #333; } 
-        #openCameraBtn { background-color: #17a2b8; color: white; margin-top: 0; margin-bottom: 10px; }
-        #clearBtn { background-color: #dc3545; color: white; font-size: 14px; padding: 10px; margin-top: 20px; }
-        #setSchoolBtn { background-color: #28a745; color: white; }
-        #editSchoolBtn { background-color: #6c757d; color: white; width: auto; padding: 5px 10px; font-size: 12px; }
+  <link rel="manifest" href="manifest.json">
 
-        #studentList div {
-            background: #fff; padding: 10px 15px; border-radius: 4px;
-            margin-bottom: 5px; border: 1px solid #eee; display: flex;
-            justify-content: space-between; align-items: center;
-        }
-        .list-preview-img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; margin-right: 15px; flex-shrink: 0; }
-        .student-info { flex-grow: 1; display: flex; flex-direction: column; font-size: 14px; }
-        .student-sub-details { font-size: 12px; color: #555; margin-top: 2px; }
-        .deleteBtn { background-color: #dc3545; color: white; padding: 5px 8px; font-size: 12px; border-radius: 4px; margin-left: 10px; width: auto; margin-top: 0; flex-shrink: 0; }
-        
-        /* Progress Bar */
-        .progress-bar {
-            width: 100%; height: 8px; background-color: #eee; border-radius: 5px;
-            margin-top: 8px; display: none; overflow: hidden;
-        }
-        .progress-bar-inner {
-            width: 0%; height: 100%; background-color: #007bff;
-            border-radius: 5px; transition: width 0.3s ease, background-color 0.3s ease;
-        }
-        .progress-complete { background-color: #28a745 !important; }
-        
-        .sync-status { font-size: 18px; margin-left: 10px; flex-shrink: 0; }
-        .sync-offline { color: #6c757d; } 
-        .sync-synced { color: #28a745; } 
-        .sync-missing { color: #e67e22; cursor: pointer; }
-        
-        #photoPreview { width: 100px; height: 100px; display: none; margin-top: 10px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }
-        
-        /* Camera Modal */
-        #cameraModal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; }
-        #cameraVideo { width: 100%; max-width: 600px; height: auto; background: #333; }
-        #captureBtn { width: 80%; max-width: 300px; padding: 15px; font-size: 18px; background-color: #dc3545; color: white; margin-top: 20px; }
-        #closeCameraBtn { position: absolute; top: 20px; right: 20px; font-size: 24px; color: white; background: none; border: none; cursor: pointer; width: auto; }
-        #cameraCanvas { display: none; }
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; margin:0; padding:20px; background:#f4f7f6; color:#333; }
+    h1 { text-align:center; color:#0056b3; }
+    .card { max-width:600px; margin:0 auto 20px; padding:20px; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    label{display:block;margin-bottom:6px;font-weight:600}
+    input, select { width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
+    button { width:100%; padding:12px; border:none; border-radius:4px; cursor:pointer; font-size:16px; margin-top:10px; }
+    #openCameraBtn{background:#17a2b8;color:white}
+    #addBtn{background:#007bff;color:white}
+    #completeBtn{background:#ffc107;color:#333}
+    #clearBtn{background:#dc3545;color:white}
+    .student-list-item { display:flex; gap:12px; align-items:center; padding:10px; background:#fff; border-radius:6px; border:1px solid #eee; margin-bottom:8px; }
+    .list-preview-img { width:40px;height:40px;object-fit:cover;border-radius:4px; }
+    .student-info { flex:1; font-size:14px; display:flex; flex-direction:column; }
+    .student-sub-details { font-size:12px;color:#555;margin-top:4px; }
+    .sync-status { margin-left:8px; font-size:18px; cursor:pointer; }
+    .sync-synced { color:#28a745; cursor:default; }
+    .sync-offline { color:#6c757d; }
+    .sync-missing { color:#e67e22; } /* reload icon */
+    .progress-bar { width:100%; height:8px; background:#eee; border-radius:5px; margin-top:8px; display:none; overflow:hidden; }
+    .progress-bar-inner { width:0%; height:100%; background:#007bff; border-radius:5px; transition:width .3s ease; }
+    #photoPreview { width:100px;height:100px;display:none;margin-top:10px;object-fit:cover;border-radius:4px;border:1px solid #ccc; }
 
-        /* Confirm Modal */
-        #confirmModal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
-        .modal-content { background-color: #fff; padding: 20px 30px; border-radius: 8px; text-align: center; max-width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .modal-buttons { display: flex; justify-content: space-between; margin-top: 20px; }
-        .modal-buttons button { width: 48%; margin: 0; }
-        #confirmYesBtn { background-color: #dc3545; color: white; }
-        #confirmNoBtn { background-color: #6c757d; color: white; }
-    </style>
+    /* camera modal */
+    #cameraModal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; flex-direction:column; }
+    #cameraVideo { width:100%; max-width:600px; background:#333; }
+    #captureBtn { width:80%; max-width:300px; padding:15px; background:#dc3545; color:white; border:none; border-radius:8px; margin-top:18px; }
+    #closeCameraBtn { position:absolute; top:20px; right:20px; font-size:28px; color:white; background:none; border:none; cursor:pointer; }
+
+    @media (max-width:720px){ .card{padding:16px} }
+  </style>
 </head>
 <body>
+  <h1>Student Data Entry</h1>
 
-    <h1 id="mainTitle">Student Data Entry</h1>
-    
-    <div id="schoolSection" class="card">
-        <h3>School Name</h3>
-        <div>
-            <label for="schoolName">Enter School Name:</label>
-            <input type="text" id="schoolName" placeholder="e.g., Saraswati Sisu Mandir">
-        </div>
-        <button id="setSchoolBtn">Set School</button>
+  <div id="schoolSection" class="card">
+    <h3>School Name</h3>
+    <label for="schoolName">Enter School Name:</label>
+    <input id="schoolName" placeholder="e.g., Saraswati Sisu Mandir" />
+    <button id="setSchoolBtn" style="background:#28a745;color:white">Set School</button>
+  </div>
+
+  <div id="schoolDisplay" class="card" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div><strong id="schoolNameDisplay"></strong></div>
+      <button id="editSchoolBtn" style="background:#6c757d;color:white;padding:6px 12px">Edit School</button>
+    </div>
+  </div>
+
+  <div id="entryForm" class="card" style="display:none;">
+    <h3>Add Students</h3>
+    <label>Full Name:</label><input id="name" placeholder="ପୂରା ନାମ" />
+    <label>Class:</label>
+    <select id="class"><option value="">ଶ୍ରେଣୀ ବାଛନ୍ତୁ</option><option>ଶିଶୁ ବାଟିକା</option><option>ପ୍ରଥମ</option><option>ଦ୍ଵିତୀୟ</option><option>ତୃତୀୟ</option></select>
+    <label>Roll No:</label><input id="roll" placeholder="ରୋଲ୍ ନମ୍ବର" />
+    <label>Date of Birth:</label><input id="dob" type="date" />
+    <label>Phone No:</label><input id="phone" />
+    <label>Blood Group:</label>
+    <select id="bloodGroup"><option value="">(Optional)</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>O+</option></select>
+
+    <label>Student Photo:</label>
+    <button id="openCameraBtn">Take a Picture</button>
+    <div style="margin-top:8px;">
+      <label style="font-weight:normal">...or Upload from Gallery</label>
+      <input id="photo" type="file" accept="image/*" />
+      <img id="photoPreview" src="" alt="Preview">
     </div>
 
-    <div id="schoolDisplay" class="card" style="display: none;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div><strong id="schoolNameDisplay"></strong></div>
-            <button id="editSchoolBtn">Edit School</button>
-        </div>
+    <button id="addBtn">Add Student</button>
+
+    <hr style="border:none;border-top:1px solid #eee;margin:18px 0">
+
+    <h3>Student Preview List</h3>
+    <div id="studentList"></div>
+
+    <button id="clearBtn" style="display:none">Clear All Local Data</button>
+    <button id="completeBtn" disabled>Download Local Backup (Excel/ZIP)</button>
+  </div>
+
+  <!-- camera modal -->
+  <div id="cameraModal">
+    <button id="closeCameraBtn">&times;</button>
+    <video id="cameraVideo" playsinline autoplay></video>
+    <canvas id="cameraCanvas" style="display:none"></canvas>
+    <button id="captureBtn">Capture</button>
+  </div>
+
+  <div id="confirmModal" style="display:none;position:fixed;left:0;top:0;width:100%;height:100%;z-index:2000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+    <div class="modal-content" style="background:#fff;padding:20px;border-radius:8px;max-width:320px;margin:0 auto;text-align:center">
+      <p id="confirmText">Are you sure?</p>
+      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;">
+        <button id="confirmYesBtn" style="background:#dc3545;color:white">Yes</button>
+        <button id="confirmNoBtn" style="background:#6c757d;color:white">No</button>
+      </div>
     </div>
-    
-    <div id="entryForm" class="card">
-        <h3>Add Students</h3>
-        <div><label for="name">Full Name:</label><input type="text" id="name" placeholder="ପୂରା ନାମ" required></div>
-        <div><label for="class">Class:</label><select id="class" required><option value="">ଶ୍ରେଣୀ ବାଛନ୍ତୁ</option><option value="ଶିଶୁ ବାଟିକା">ଶିଶୁ ବାଟିକା</option><option value="ପ୍ରଥମ">ପ୍ରଥମ</option><option value="ଦ୍ଵିତୀୟ">ଦ୍ଵିତୀୟ</option><option value="ତୃତୀୟ">ତୃତୀୟ</option><option value="ଚତୁର୍ଥ">ଚତୁର୍ଥ</option><option value="ପଞ୍ଚମ">ପଞ୍ଚମ</option><option value="ଷଷ୍ଠ">ଷଷ୍ଠ</option><option value="ସପ୍ତମ">ସପ୍ତମ</option><option value="ଅଷ୍ଟମ">ଅଷ୍ଟମ</option><option value="ନବମ">ନବମ</option><option value="ଦଶମ">ଦଶମ</option></select></div>
-        <div><label for="roll">Roll No:</label><input type="text" id="roll" placeholder="ରୋଲ୍ ନମ୍ବର" required></div>
-        <div><label for="dob">Date of Birth:</label><input type="date" id="dob" placeholder="ଜନ୍ମ ତାରିଖ" required></div>
-        <div><label for="phone">Phone No:</label><input type="text" id="phone" placeholder="ଫୋନ୍ ନମ୍ବର"></div>
-        <div><label for="bloodGroup">Blood Group:</label><select id="bloodGroup"><option value="">Select Blood Group (Optional)</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></div>
-        <div>
-            <label>Student Photo:</label>
-            <button id="openCameraBtn">Take a Picture</button>
-            <label for="photo" style="font-weight: normal; margin-top: 5px;">...or Upload from Gallery:</label>
-            <input type="file" id="photo" accept="image/png, image/jpeg">
-            <img id="photoPreview" src="" alt="Student Preview">
-        </div>
-        
-        <button id="addBtn">Add Student</button>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
-        
-        <h3 style="margin-top: 10px;">Student Preview List</h3>
-        <div id="studentList"></div>
-        
-        <button id="clearBtn">Clear All Data</button>
-        <button id="completeBtn" disabled>Download Local Backup (Excel/ZIP)</button> 
-    </div>
+  </div>
 
-    <div id="cameraModal"><button id="closeCameraBtn">&times;</button><video id="cameraVideo" playsinline autoplay></video><canvas id="cameraCanvas"></canvas><button id="captureBtn">Capture</button></div>
-    <div id="confirmModal"><div class="modal-content"><p id="confirmText">Are you sure?</p><div class="modal-buttons"><button id="confirmYesBtn">Yes</button><button id="confirmNoBtn">No</button></div></div></div>
+  <script>
+    // small helpers & globals
+    const odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
+    const odiaMonths = ['ଜାନୁଆରୀ','ଫେବୃଆରୀ','ମାର୍ଚ୍ଚ','ଅପ୍ରେଲ','ମଇ','ଜୁନ୍','ଜୁଲାଇ','ଅଗଷ୍ଟ','ସେପ୍ଟେମ୍ବର','ଅକ୍ଟୋବର','ନଭେମ୍ବର','ଡିସେମ୍ବର'];
 
-    <script>
-        const odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
-        const odiaMonths = ['ଜାନୁଆରୀ', 'ଫେବୃଆରୀ', 'ମାର୍ଚ୍ଚ', 'ଅପ୍ରେଲ', 'ମଇ', 'ଜୁନ୍', 'ଜୁଲାଇ', 'ଅଗଷ୍ଟ', 'ସେପ୍ଟେମ୍ବର', 'ଅକ୍ଟୋବର', 'ନଭେମ୍ବର', 'ଡିସେମ୍ବର'];
-        let students = [], capturedPhotoFile = null, cameraStream = null, localDB, fbDB, currentSchoolName = '';
+    let students = [], capturedPhotoFile = null, cameraStream = null, localDB = null, fbDB = null, currentSchoolName = '';
 
-        const entryForm = document.getElementById('entryForm'), completeBtn = document.getElementById('completeBtn'), addBtn = document.getElementById('addBtn'), nameInput = document.getElementById('name'), classSelect = document.getElementById('class'), rollInput = document.getElementById('roll'), dobInput = document.getElementById('dob'), phoneInput = document.getElementById('phone'), bloodGroupSelect = document.getElementById('bloodGroup'), photoInput = document.getElementById('photo'), photoPreview = document.getElementById('photoPreview'), studentListDiv = document.getElementById('studentList'), clearBtn = document.getElementById('clearBtn'), confirmModal = document.getElementById('confirmModal'), confirmYesBtn = document.getElementById('confirmYesBtn'), confirmNoBtn = document.getElementById('confirmNoBtn'), confirmText = document.getElementById('confirmText'), cameraModal = document.getElementById('cameraModal'), openCameraBtn = document.getElementById('openCameraBtn'), closeCameraBtn = document.getElementById('closeCameraBtn'), cameraVideo = document.getElementById('cameraVideo'), cameraCanvas = document.getElementById('cameraCanvas'), captureBtn = document.getElementById('captureBtn'), schoolSection = document.getElementById('schoolSection'), schoolDisplay = document.getElementById('schoolDisplay'), schoolNameInput = document.getElementById('schoolName'), schoolNameDisplay = document.getElementById('schoolNameDisplay'), setSchoolBtn = document.getElementById('setSchoolBtn'), editSchoolBtn = document.getElementById('editSchoolBtn');
-        
-        try {
-            // YOUR SPECIFIC KEYS EMBEDDED HERE
-            const firebaseConfig = {
-              apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
-              authDomain: "idcard-60586.firebaseapp.com",
-              projectId: "idcard-60586",
-              storageBucket: "idcard-60586.firebasestorage.app",
-              messagingSenderId: "331979663377",
-              appId: "1:331979663377:web:026e537a7fcaca813129b0",
-              measurementId: "G-PXVV87C78S"
-            };
-            firebase.initializeApp(firebaseConfig);
-            fbDB = firebase.firestore();
-            console.log("Firebase initialized (Firestore Only)");
-        } catch (e) { console.error("Firebase Init Error:", e); }
+    // DOM
+    const entryForm = document.getElementById('entryForm');
+    const setSchoolBtn = document.getElementById('setSchoolBtn');
+    const schoolNameInput = document.getElementById('schoolName');
+    const schoolDisplay = document.getElementById('schoolDisplay');
+    const schoolNameDisplay = document.getElementById('schoolNameDisplay');
+    const editSchoolBtn = document.getElementById('editSchoolBtn');
+    const openCameraBtn = document.getElementById('openCameraBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const closeCameraBtn = document.getElementById('closeCameraBtn');
+    const cameraModal = document.getElementById('cameraModal');
+    const cameraVideo = document.getElementById('cameraVideo');
+    const cameraCanvas = document.getElementById('cameraCanvas');
+    const photoInput = document.getElementById('photo');
+    const photoPreview = document.getElementById('photoPreview');
+    const studentListDiv = document.getElementById('studentList');
+    const clearBtn = document.getElementById('clearBtn');
+    const completeBtn = document.getElementById('completeBtn');
 
-        function setSchool(name) { currentSchoolName = name; localStorage.setItem('schoolName', name); schoolNameDisplay.textContent = `School: ${name}`; schoolSection.style.display = 'none'; schoolDisplay.style.display = 'block'; entryForm.style.display = 'block'; loadStudentsFromDB(); }
-        setSchoolBtn.addEventListener('click', () => { const name = schoolNameInput.value.trim(); if (name) setSchool(name); else alert('Enter school name.'); });
-        editSchoolBtn.addEventListener('click', () => { schoolSection.style.display = 'block'; schoolDisplay.style.display = 'none'; entryForm.style.display = 'none'; studentListDiv.innerHTML = ''; students = []; });
-        const savedSchool = localStorage.getItem('schoolName'); if (savedSchool) { schoolNameInput.value = savedSchool; setSchool(savedSchool); }
+    // firebase init
+    try {
+      const firebaseConfig = {
+        apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+        authDomain: "idcard-60586.firebaseapp.com",
+        projectId: "idcard-60586",
+        storageBucket: "idcard-60586.firebasestorage.app",
+        messagingSenderId: "331979663377",
+        appId: "1:331979663377:web:026e537a7fcaca813129b0",
+        measurementId: "G-PXVV87C78S"
+      };
+      firebase.initializeApp(firebaseConfig);
+      fbDB = firebase.firestore();
+      window.fbDB = fbDB;
+    } catch(e){ console.error('Firebase init error', e); }
 
-        if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js')); }
-        
-        const request = indexedDB.open('studentDB-v3-base64', 1);
-        request.onupgradeneeded = (e) => { localDB = e.target.result; if (!localDB.objectStoreNames.contains('students')) { const store = localDB.createObjectStore('students', { keyPath: 'id' }); store.createIndex('schoolName', 'schoolName', { unique: false }); } };
-        request.onsuccess = (e) => { localDB = e.target.result; if (currentSchoolName) loadStudentsFromDB(); };
-        
-        function loadStudentsFromDB() {
-            if (!localDB || !currentSchoolName) return;
-            const tx = localDB.transaction(['students'], 'readonly');
-            const store = tx.objectStore('students');
-            const index = store.index('schoolName');
-            const req = index.getAll(currentSchoolName);
-            req.onsuccess = () => { students = req.result; renderStudentList(); students.forEach(s => { if (!s.synced) uploadStudent(s); }); };
-        }
-        
-        function renderStudent(student) {
-            const div = document.createElement('div');
-            div.dataset.studentId = student.id;
-            let url = student.photoBase64 || (student.photoFile ? URL.createObjectURL(student.photoFile) : 'https://placehold.co/40x40/eee/aaa?text=...');
-            
-            const blood = student.bloodGroup ? ` | Blood: ${student.bloodGroup}` : '';
-            const syncIcon = student.synced ? '✅' : '☁️';
-            const syncClass = student.synced ? 'sync-synced' : 'sync-offline';
-            div.innerHTML = `<img src="${url}" class="list-preview-img" alt="Photo"><div class="student-info"><span class="student-main-details"><strong>${student.name}</strong> (Class: ${student.class}, Roll: ${student.roll})</span><span class="student-sub-details">DOB: ${student.dobOdia || 'N/A'}${blood}</span><div class="progress-bar" id="progress-${student.id}"><div class="progress-bar-inner" id="progress-inner-${student.id}"></div></div></div><span class="sync-status ${syncClass}" id="sync-${student.id}">${syncIcon}</span><button class="deleteBtn" data-id="${student.id}">Delete</button>`;
-            studentListDiv.appendChild(div);
-        }
-        function renderStudentList() { studentListDiv.innerHTML = ''; students.forEach(renderStudent); completeBtn.disabled = students.length === 0; clearBtn.style.display = students.length === 0 ? 'none' : 'block'; }
-        function convertToOdiaDate(d) { if (!d) return ''; try { const [y, m, day] = d.split('-'); return `${day.split('').map(x=>odiaDigits[x]).join('')} ${odiaMonths[m-1]} ${y.split('').map(x=>odiaDigits[x]).join('')}`; } catch (e) { return ''; } }
-        function generateRandomText(l) { let r = '', c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'; for (let i = 0; i < l; i++) r += c.charAt(Math.floor(Math.random() * c.length)); return r; }
+    // indexedDB setup
+    const request = indexedDB.open('studentDB-v3-base64', 1);
+    request.onupgradeneeded = (e) => {
+      localDB = e.target.result;
+      if (!localDB.objectStoreNames.contains('students')) {
+        const store = localDB.createObjectStore('students', { keyPath:'id' });
+        store.createIndex('schoolName', 'schoolName', { unique:false });
+      }
+    };
+    request.onsuccess = (e) => { localDB = e.target.result; const saved = localStorage.getItem('schoolName'); if (saved) { schoolNameInput.value = saved; setSchool(saved); } };
 
-        async function startCamera() { 
-            try { 
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); 
-                cameraVideo.srcObject = cameraStream; 
-                cameraModal.style.display = 'flex'; 
-                // ensure video starts playing
-                await cameraVideo.play().catch(()=>{}); 
-            } catch (e) { alert('Error opening camera.'); } 
-        }
-        function stopCamera() { 
-            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; } 
-            cameraModal.style.display = 'none'; 
-        }
-        openCameraBtn.addEventListener('click', (e) => { e.preventDefault(); startCamera(); }); 
-        closeCameraBtn.addEventListener('click', stopCamera);
+    // set / edit school
+    setSchoolBtn.addEventListener('click', () => {
+      const n = schoolNameInput.value.trim();
+      if (!n) return alert('Enter school name.');
+      setSchool(n);
+    });
+    editSchoolBtn.addEventListener('click', () => {
+      document.getElementById('schoolSection').style.display = 'block';
+      schoolDisplay.style.display = 'none';
+      entryForm.style.display = 'none';
+      studentListDiv.innerHTML = '';
+      students = [];
+    });
+    function setSchool(name) {
+      currentSchoolName = name;
+      localStorage.setItem('schoolName', name);
+      schoolNameDisplay.textContent = `School: ${name}`;
+      document.getElementById('schoolSection').style && (document.getElementById('schoolSection').style.display = 'none');
+      schoolDisplay.style.display = 'block';
+      entryForm.style.display = 'block';
+      loadStudentsFromDB();
+    }
 
-        // --- FIXED capture logic: wait for video frame readiness, show preview immediately ---
-        captureBtn.addEventListener('click', async () => {
-            captureBtn.disabled = true;
+    // service worker optional
+    if ('serviceWorker' in navigator) window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+    // load from indexedDB
+    function loadStudentsFromDB() {
+      if (!localDB || !currentSchoolName) return;
+      const tx = localDB.transaction(['students'],'readonly');
+      const store = tx.objectStore('students');
+      const index = store.index('schoolName');
+      const req = index.getAll(currentSchoolName);
+      req.onsuccess = async () => {
+        students = req.result || [];
+        // For students that were marked synced=true, check whether they still exist on server:
+        // If server doc missing -> mark missing=true and synced=false (do NOT auto-reupload)
+        // If synced=false (never uploaded) -> auto-upload as before
+        await Promise.all(students.map(async (s) => {
+          if (s.synced) {
             try {
-                // Wait for a usable frame: videoWidth/videoHeight > 0
-                const waitForVideoReady = () => new Promise((resolve, reject) => {
-                    const maxWait = 800; // ms
-                    const interval = 50;
-                    let waited = 0;
-                    (function check() {
-                        if (cameraVideo.videoWidth && cameraVideo.videoHeight) return resolve();
-                        waited += interval;
-                        if (waited >= maxWait) return resolve(); // still try even if not fully ready
-                        setTimeout(check, interval);
-                    })();
-                });
-                await waitForVideoReady();
-
-                // Set canvas size from video (fallback to 1280x960 if zero)
-                const w = cameraVideo.videoWidth || 1280;
-                const h = cameraVideo.videoHeight || Math.round(w * 3 / 4);
-                cameraCanvas.width = w;
-                cameraCanvas.height = h;
-
-                const ctx = cameraCanvas.getContext('2d');
-                ctx.drawImage(cameraVideo, 0, 0, w, h);
-
-                // Convert to blob and create File
-                const blob = await new Promise((res) => cameraCanvas.toBlob(res, 'image/jpeg', 0.9));
-                if (!blob) throw new Error('Could not capture image');
-
-                capturedPhotoFile = new File([blob], 'cam.jpg', { type: 'image/jpeg' });
-
-                // Show preview right away (like previous app)
-                handlePhotoPreview(capturedPhotoFile);
-
-                // Close camera after showing preview
-                stopCamera();
-            } catch (err) {
-                console.error('Capture error:', err);
-                alert('Capture failed: ' + (err.message || err));
-            } finally {
-                captureBtn.disabled = false;
-            }
-        });
-
-        function compressImage(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 800;
-                        const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = MAX_WIDTH;
-                        canvas.height = img.height * scaleSize;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.7)); 
-                    };
-                };
-                reader.onerror = (error) => reject(error);
-            });
-        }
-
-        addBtn.addEventListener('click', async () => {
-            try {
-                if (!currentSchoolName) { alert('School name not set.'); return; }
-                const cls = classSelect.value.trim(), roll = rollInput.value.trim(), name = nameInput.value.trim(), dob = dobInput.value, bg = bloodGroupSelect.value.trim();
-                const photo = capturedPhotoFile || photoInput.files[0];
-                if (!name || !cls || !roll) { alert('Fill Name, Class, Roll.'); return; }
-                if (!photo) { alert('Upload Photo.'); return; }
-                
-                const base64Image = await compressImage(photo);
-                
-                const ext = photo.name ? (photo.name.split('.').pop().toLowerCase() || 'jpg') : 'jpg';
-                const student = { 
-                    id: Date.now(), 
-                    schoolName: currentSchoolName, 
-                    name: name, class: cls, dob: dob, dobOdia: convertToOdiaDate(dob), bloodGroup: bg, roll: roll, phone: phoneInput.value, 
-                    photoFile: photo, 
-                    photoBase64: base64Image, 
-                    newPhotoName: `${generateRandomText(10)}.${ext}`, 
-                    synced: false 
-                };
-                
-                if (!localDB) { alert("Database loading..."); return; }
-                const tx = localDB.transaction(['students'], 'readwrite');
-                tx.objectStore('students').add(student).onsuccess = () => {
-                    students.push(student); renderStudentList(); uploadStudent(student);
-                    nameInput.value=''; classSelect.value=''; rollInput.value=''; dobInput.value=''; phoneInput.value=''; bloodGroupSelect.value=''; photoInput.value=''; capturedPhotoFile=null; photoPreview.style.display='none'; nameInput.focus();
-                };
-            } catch (err) { alert("Error adding: " + err.message); }
-        });
-        
-        function uploadStudent(student) {
-            if (!fbDB) { alert("Firebase not connected."); return; }
-            
-            const barContainer = document.getElementById(`progress-${student.id}`);
-            const barInner = document.getElementById(`progress-inner-${student.id}`);
-            if (barContainer) { barContainer.style.display = 'block'; barInner.style.width = '50%'; }
-
-            const data = { 
-                id: student.id, schoolName: student.schoolName, 
-                name: student.name, class: student.class, dob: student.dob, 
-                bloodGroup: student.bloodGroup, roll: student.roll, phone: student.phone, 
-                newPhotoName: student.newPhotoName, 
-                photoBase64: student.photoBase64, 
-                submittedAt: firebase.firestore.FieldValue.serverTimestamp() 
-            };
-
-            fbDB.collection('students').doc(student.id.toString()).set(data).then(() => {
-                if (barInner) { barInner.style.width = '100%'; barInner.classList.add('progress-complete'); }
-                const synced = { ...student }; delete synced.photoFile; synced.synced = true; 
-                const tx = localDB.transaction(['students'], 'readwrite'); tx.objectStore('students').put(synced);
-                setTimeout(() => { if (barContainer) barContainer.style.display = 'none'; const icon = document.getElementById(`sync-${student.id}`); if (icon) { icon.textContent = '✅'; icon.className = 'sync-status sync-synced'; } }, 1500);
-            }).catch(error => {
-                console.error("Upload failed", error);
-                alert("Upload failed: " + error.message);
-            });
-        }
-        
-        function handlePhotoPreview(f) { if(f) { photoPreview.src = URL.createObjectURL(f); photoPreview.style.display = 'block'; } else { photoPreview.style.display = 'none'; } }
-        photoInput.addEventListener('change', () => { if(photoInput.files[0]) { capturedPhotoFile=null; handlePhotoPreview(photoInput.files[0]); } });
-        
-        studentListDiv.addEventListener('click', (e) => {
-            if (e.target.classList.contains('deleteBtn')) {
-                const id = Number(e.target.dataset.id);
-                localDB.transaction(['students'], 'readwrite').objectStore('students').delete(id).onsuccess = () => {
-                    students = students.filter(s => s.id !== id); renderStudentList();
-                    if (fbDB) fbDB.collection('students').doc(id.toString()).delete().catch(console.error);
-                };
-            }
-        });
-
-        // ONE-CLICK DOWNLOAD
-        completeBtn.addEventListener('click', async () => { 
-            if (!students.length) return;
-            completeBtn.disabled = true; 
-            completeBtn.textContent = "Processing...";
-            
-            try {
-                const {zipBlob, zipFileName} = await createZipData();
-                downloadBlob(zipBlob, zipFileName, 'application/zip');
+              const doc = await fbDB.collection('students').doc(s.id.toString()).get();
+              if (!doc.exists) {
+                s.synced = false; s.missing = true;
+                // persist change locally
+                const tx2 = localDB.transaction(['students'],'readwrite'); tx2.objectStore('students').put(s);
+              } else {
+                s.missing = false;
+              }
             } catch(e) {
-                alert("Error: " + e.message);
-            } finally {
-                completeBtn.disabled = false;
-                completeBtn.textContent = "Download Local Backup (Excel/ZIP)";
+              // if firestore unreachable, keep current flags unchanged
+              console.warn('Could not verify server for', s.id, e);
             }
-        });
+          } else {
+            // not synced: keep for auto-upload (unless s.missing===true which means previously deleted on server)
+            if (!s.missing) {
+              // auto upload new unsynced items
+              uploadStudent(s);
+            }
+          }
+        }));
+        renderStudentList();
+      };
+    }
 
-        async function createZipData() {
-             return new Promise((resolve, reject) => {
-                const tx = localDB.transaction(['students'], 'readonly');
-                const store = tx.objectStore('students');
-                const index = store.index('schoolName');
-                index.getAll(currentSchoolName).onsuccess = (e) => {
-                    const dbStudents = e.target.result;
-                    const excelData = dbStudents.map(s => {
-                        let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
-                        return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
-                    });
-                    
-                    const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
-                    const wb = XLSX.utils.book_new(); 
-                    
-                    // Use School Name for the Excel Sheet Name
-                    const sheetName = (currentSchoolName || "Students").replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
-                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                    
-                    const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                    const zip = new JSZip(); zip.file('student_data.xlsx', excelBlob);
-                    
-                    dbStudents.forEach(s => { 
-                        if(s.photoFile) {
-                            zip.file(s.newPhotoName, s.photoFile); 
-                        } else if (s.photoBase64) {
-                            const byteString = atob(s.photoBase64.split(',')[1]);
-                            const ab = new ArrayBuffer(byteString.length);
-                            const ia = new Uint8Array(ab);
-                            for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-                            zip.file(s.newPhotoName, new Blob([ab], {type: 'image/jpeg'}));
-                        }
-                    });
-                    zip.generateAsync({ type: 'blob' }).then(blob => resolve({zipBlob: blob, zipFileName: `${currentSchoolName}_backup.zip`}));
-                };
-            });
+    // render helpers
+    function renderStudentList() {
+      studentListDiv.innerHTML = '';
+      students.forEach(s => renderStudent(s));
+      completeBtn.disabled = students.length === 0;
+      clearBtn.style.display = students.length ? 'block' : 'none';
+    }
+
+    function renderStudent(student) {
+      const div = document.createElement('div');
+      div.className = 'student-list-item';
+      div.dataset.studentId = student.id;
+      const url = student.photoBase64 || (student.photoFile ? URL.createObjectURL(student.photoFile) : 'https://placehold.co/40x40/eee/aaa?text=...');
+
+      // determine status icon: synced ✅ (not clickable), missing 🔄 (clickable), offline ☁️ (not clickable)
+      let statusIcon = '';
+      let statusClass = '';
+      if (student.missing) { statusIcon = '🔄'; statusClass = 'sync-missing'; } 
+      else if (student.synced) { statusIcon = '✅'; statusClass = 'sync-synced'; } 
+      else { statusIcon = '☁️'; statusClass = 'sync-offline'; }
+
+      div.innerHTML = `
+        <img src="${url}" class="list-preview-img" alt="photo">
+        <div class="student-info">
+          <div><strong>${escapeHtml(student.name||'')}</strong> (Class: ${escapeHtml(student.class||'')}, Roll: ${escapeHtml(student.roll||'')})</div>
+          <div class="student-sub-details">DOB: ${escapeHtml(student.dobOdia||'N/A')} ${student.bloodGroup ? '| Blood: ' + escapeHtml(student.bloodGroup) : ''}</div>
+          <div class="progress-bar" id="progress-${student.id}"><div class="progress-bar-inner" id="progress-inner-${student.id}"></div></div>
+        </div>
+        <span class="sync-status ${statusClass}" id="sync-${student.id}" title="${student.missing ? 'Reload to re-upload to server' : (student.synced ? 'Synced' : 'Not uploaded yet')}">${statusIcon}</span>
+        <button class="deleteBtn" data-id="${student.id}" style="margin-left:10px;background:#dc3545;color:#fff;padding:6px 8px;border-radius:6px">Delete</button>
+      `;
+      studentListDiv.appendChild(div);
+    }
+
+    // small HTML escape
+    function escapeHtml(s) { return (s+'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // photo preview
+    function handlePhotoPreview(fileOrBlob) {
+      if (!fileOrBlob) { photoPreview.style.display = 'none'; return; }
+      photoPreview.src = URL.createObjectURL(fileOrBlob);
+      photoPreview.style.display = 'block';
+    }
+
+    // camera logic (improved capture)
+    openCameraBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' }, audio:false });
+        cameraVideo.srcObject = cameraStream;
+        cameraModal.style.display = 'flex';
+        await cameraVideo.play().catch(()=>{});
+      } catch (err) {
+        alert('Error opening camera: ' + (err.message || err));
+      }
+    });
+    closeCameraBtn.addEventListener('click', stopCamera);
+    function stopCamera() {
+      if (cameraStream) { cameraStream.getTracks().forEach(t=>t.stop()); cameraStream = null; }
+      cameraModal.style.display = 'none';
+    }
+
+    captureBtn.addEventListener('click', async () => {
+      captureBtn.disabled = true;
+      try {
+        // wait briefly for video frame to be ready
+        await waitForVideoFrame(cameraVideo, 800);
+
+        const w = cameraVideo.videoWidth || 1280;
+        const h = cameraVideo.videoHeight || Math.round(w * 3/4);
+        cameraCanvas.width = w; cameraCanvas.height = h;
+        const ctx = cameraCanvas.getContext('2d');
+        ctx.drawImage(cameraVideo, 0, 0, w, h);
+        const blob = await new Promise(res => cameraCanvas.toBlob(res, 'image/jpeg', 0.9));
+        if (!blob) throw new Error('Capture failed');
+        capturedPhotoFile = new File([blob], 'cam.jpg', { type:'image/jpeg' });
+        handlePhotoPreview(capturedPhotoFile);
+        stopCamera();
+      } catch (err) {
+        console.error('Capture error', err);
+        alert('Capture failed: ' + (err.message || err));
+      } finally {
+        captureBtn.disabled = false;
+      }
+    });
+
+    function waitForVideoFrame(videoEl, maxWaitMs=800) {
+      return new Promise((resolve) => {
+        const interval = 50;
+        let waited=0;
+        (function check(){
+          if (videoEl.videoWidth && videoEl.videoHeight) return resolve();
+          waited += interval;
+          if (waited >= maxWaitMs) return resolve();
+          setTimeout(check, interval);
+        })();
+      });
+    }
+
+    // compress image to base64 (same as before)
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.src = ev.target.result;
+          img.onload = () => {
+            const MAX_WIDTH = 800;
+            const scale = Math.min(1, MAX_WIDTH / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.onerror = reject;
+        };
+        reader.onerror = reject;
+      });
+    }
+
+    // add student
+    document.getElementById('addBtn').addEventListener('click', async () => {
+      try {
+        if (!currentSchoolName) return alert('School name not set.');
+        const name = document.getElementById('name').value.trim();
+        const cls = document.getElementById('class').value.trim();
+        const roll = document.getElementById('roll').value.trim();
+        const dob = document.getElementById('dob').value;
+        const phone = document.getElementById('phone').value.trim();
+        const blood = document.getElementById('bloodGroup').value;
+
+        const photo = capturedPhotoFile || (photoInput.files[0] || null);
+        if (!name || !cls || !roll) return alert('Fill Name, Class, Roll.');
+        if (!photo) return alert('Upload Photo.');
+
+        const base64Image = await compressImage(photo);
+        const ext = (photo.name && photo.name.split('.').pop()) || 'jpg';
+        const newPhotoName = `${randomText(10)}.${ext}`;
+
+        const student = {
+          id: Date.now(),
+          schoolName: currentSchoolName,
+          name, class: cls, dob, dobOdia: convertToOdiaDate(dob), bloodGroup: blood, roll, phone,
+          photoFile: photo instanceof File ? photo : null,
+          photoBase64: base64Image,
+          newPhotoName,
+          synced: false,
+          missing: false
+        };
+
+        const tx = localDB.transaction(['students'],'readwrite');
+        tx.objectStore('students').add(student).onsuccess = () => {
+          students.push(student);
+          renderStudent(student);
+          // auto upload (only for non-missing)
+          uploadStudent(student);
+          // reset form
+          document.getElementById('name').value=''; document.getElementById('class').value=''; document.getElementById('roll').value=''; document.getElementById('dob').value=''; document.getElementById('phone').value=''; document.getElementById('bloodGroup').value='';
+          photoInput.value=''; capturedPhotoFile=null; photoPreview.style.display='none';
+          renderStudentList();
+        };
+      } catch(err){ alert('Add failed: '+(err.message||err)); console.error(err); }
+    });
+
+    function convertToOdiaDate(d) {
+      if (!d) return '';
+      try {
+        const [y,m,day] = d.split('-');
+        return `${Array.from(day).map(x=>odiaDigits[x]||x).join('')} ${odiaMonths[Number(m)-1]||''} ${Array.from(y).map(x=>odiaDigits[x]||x).join('')}`;
+      } catch(e){ return d; }
+    }
+    function randomText(l) { let r=''; const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; for(let i=0;i<l;i++) r+=c.charAt(Math.floor(Math.random()*c.length)); return r; }
+
+    // Upload a student to Firestore (used for auto-upload and manual reload)
+    async function uploadStudent(student) {
+      if (!fbDB) { console.warn('Firebase not connected'); return; }
+      // if student.missing === true that indicates server doc was intentionally removed -> we DO NOT auto-upload
+      if (student.missing) return;
+
+      // show progress bar
+      const barContainer = document.getElementById(`progress-${student.id}`);
+      const barInner = document.getElementById(`progress-inner-${student.id}`);
+      if (barContainer) { barContainer.style.display='block'; barInner.style.width='30%'; }
+
+      const data = {
+        id: student.id,
+        schoolName: student.schoolName,
+        name: student.name,
+        class: student.class,
+        dob: student.dob,
+        bloodGroup: student.bloodGroup,
+        roll: student.roll,
+        phone: student.phone,
+        newPhotoName: student.newPhotoName,
+        photoBase64: student.photoBase64,
+        submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      try {
+        await fbDB.collection('students').doc(student.id.toString()).set(data);
+        // mark synced
+        student.synced = true; student.missing = false;
+        // update local DB (remove photoFile to save space)
+        const copy = Object.assign({}, student);
+        delete copy.photoFile;
+        const tx = localDB.transaction(['students'],'readwrite');
+        tx.objectStore('students').put(copy);
+        if (barInner) { barInner.style.width='100%'; barInner.classList.add('progress-complete'); }
+        setTimeout(()=>{ if (barContainer) barContainer.style.display='none'; const icon = document.getElementById(`sync-${student.id}`); if (icon){ icon.textContent='✅'; icon.className='sync-status sync-synced'; } }, 800);
+      } catch(err) {
+        console.error('Upload failed', err);
+        if (barInner) barInner.style.width='0%';
+        alert('Upload failed: ' + (err.message||err));
+      }
+    }
+
+    // Listen for clicks on student list: delete & reload-only
+    studentListDiv.addEventListener('click', (e) => {
+      const target = e.target;
+      if (target.classList.contains('deleteBtn')) {
+        const id = Number(target.dataset.id);
+        showConfirm(`Delete local student ${id}? Also deletes from server if uploaded.`, () => {
+          // delete locally and from firestore
+          const tx = localDB.transaction(['students'],'readwrite');
+          tx.objectStore('students').delete(id).onsuccess = () => {
+            students = students.filter(s => s.id !== id);
+            renderStudentList();
+            if (fbDB) fbDB.collection('students').doc(id.toString()).delete().catch(()=>{});
+          };
+        });
+      }
+      if (target.classList.contains('sync-status') || target.closest('.sync-status')) {
+        // Click on sync icon (only react if missing)
+        const span = target.classList.contains('sync-status') ? target : target.closest('.sync-status');
+        const id = Number(span.id.replace('sync-',''));
+        const student = students.find(s => s.id === id);
+        if (!student) return;
+        if (student.missing) {
+          // user wants to reload/reupload this student
+          showConfirm(`Re-upload this student's data to Firestore?`, async () => {
+            // remove missing flag and upload
+            student.missing = false;
+            await uploadStudent(student);
+            renderStudentList();
+          });
+        } else {
+          // other statuses: do nothing
         }
-        
-        function downloadBlob(content, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], {type})); a.download = name; a.click(); }
-        clearBtn.addEventListener('click', () => { confirmText.textContent = `Delete ALL local data for ${currentSchoolName}?`; confirmModal.style.display = 'flex'; });
-        confirmNoBtn.addEventListener('click', () => confirmModal.style.display = 'none');
-        confirmYesBtn.addEventListener('click', () => { confirmModal.style.display = 'none'; const tx = localDB.transaction(['students'], 'readwrite'); tx.objectStore('students').index('schoolName').getAll(currentSchoolName).onsuccess = (e) => { e.target.result.forEach(s => { localDB.transaction(['students'], 'readwrite').objectStore('students').delete(s.id); }); students = []; renderStudentList(); }; });
-    </script>
+      }
+    });
+
+    // student delete button listener inside studentListDiv
+    studentListDiv.addEventListener('click', (e) => {
+      // handled above
+    });
+
+    // check server for each locally-known, previously-synced student when app starts / loads DB
+    // This is done inside loadStudentsFromDB() above.
+
+    // helper: show confirm modal
+    function showConfirm(text, onYes) {
+      const modal = document.getElementById('confirmModal');
+      document.getElementById('confirmText').textContent = text;
+      modal.style.display = 'flex';
+      const yes = document.getElementById('confirmYesBtn'), no = document.getElementById('confirmNoBtn');
+
+      function cleanup() { no.removeEventListener('click', onNo); yes.removeEventListener('click', onYesClick); modal.style.display='none'; }
+      function onNo(){ cleanup(); }
+      function onYesClick(){ cleanup(); onYes && onYes(); }
+      no.addEventListener('click', onNo);
+      yes.addEventListener('click', onYesClick);
+    }
+
+    // file upload preview
+    photoInput.addEventListener('change', () => {
+      if (photoInput.files[0]) {
+        capturedPhotoFile = null;
+        handlePhotoPreview(photoInput.files[0]);
+      }
+    });
+
+    // clear all local data
+    clearBtn.addEventListener('click', () => {
+      showConfirm(`Delete ALL local data for ${currentSchoolName}?`, () => {
+        const tx = localDB.transaction(['students'],'readwrite');
+        const index = tx.objectStore('students').index('schoolName');
+        index.getAll(currentSchoolName).onsuccess = (e) => {
+          e.target.result.forEach(s => localDB.transaction(['students'],'readwrite').objectStore('students').delete(s.id));
+          students = []; renderStudentList();
+        };
+      });
+    });
+
+    // Download local backup (same as before)
+    completeBtn.addEventListener('click', async () => {
+      if (!students.length) return;
+      completeBtn.disabled = true; completeBtn.textContent = 'Processing...';
+      try {
+        const {zipBlob, zipFileName} = await createZipData();
+        downloadBlob(zipBlob, zipFileName, 'application/zip');
+      } catch(e){ alert('Error: '+(e.message||e)); }
+      finally { completeBtn.disabled = false; completeBtn.textContent = 'Download Local Backup (Excel/ZIP)'; }
+    });
+
+    function createZipData() {
+      return new Promise((resolve, reject) => {
+        const tx = localDB.transaction(['students'],'readonly');
+        const store = tx.objectStore('students');
+        const index = store.index('schoolName');
+        index.getAll(currentSchoolName).onsuccess = (e) => {
+          const dbStudents = e.target.result || [];
+          const excelData = dbStudents.map(s => {
+            let d = s.dob; try{ const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}` } catch(e){}
+            return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: s.newPhotoName || '' };
+          });
+          const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','class','dob','bloodGroup','rollno','phone','photo'] });
+          const wb = XLSX.utils.book_new();
+          const sheetName = (currentSchoolName || 'Students').replace(/[\\\/\?\*\[\]\:\"]/g,'').substring(0,31);
+          XLSX.utils.book_append_sheet(wb, ws, sheetName);
+          const excelBlob = new Blob([XLSX.write(wb, { bookType:'xlsx', type:'array' })]);
+          const zip = new JSZip(); zip.file('student_data.xlsx', excelBlob);
+
+          dbStudents.forEach(s => {
+            if (s.photoFile) zip.file(s.newPhotoName, s.photoFile);
+            else if (s.photoBase64) {
+              const byteString = atob(s.photoBase64.split(',')[1] || '');
+              const ab = new ArrayBuffer(byteString.length);
+              const ia = new Uint8Array(ab);
+              for (let i=0;i<byteString.length;i++) ia[i] = byteString.charCodeAt(i);
+              zip.file(s.newPhotoName, new Blob([ab], { type:'image/jpeg' }));
+            }
+          });
+
+          zip.generateAsync({ type:'blob' }).then(blob => resolve({ zipBlob: blob, zipFileName: `${currentSchoolName}_backup.zip` })).catch(reject);
+        };
+      });
+    }
+
+    function downloadBlob(content, name, type) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], {type}));
+      a.download = name; a.click();
+    }
+
+    // when page loads and db ready, we already call loadStudentsFromDB in indexedDB onsuccess
+    // Note: that function handles auto-upload for unsynced entries but does NOT auto-reupload for those marked .missing
+
+  </script>
 </body>
 </html>
