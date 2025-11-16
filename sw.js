@@ -1,5 +1,5 @@
 // UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v13-odia-text';
+const CACHE_NAME = 'student-data-cache-v14-center-crop';
 
 const urlsToCache = [
   './',
@@ -55,3 +55,4 @@ self.addEventListener('activate', event => {
     })
   );
 });
+
