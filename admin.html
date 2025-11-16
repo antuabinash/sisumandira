@@ -81,7 +81,7 @@
             </div>
             <button id="generateBtn" disabled>Generate & Download ID Cards</button>
         </div>
-        <p id="generatorStatus">Please upload template, font, and wait for AI model to load...</p>
+        <p id="generatorStatus">Waiting for: Template, Font, AI Model (Loading...)</p>
     </div>
 
     <div class="card">
@@ -369,8 +369,6 @@
         let faceDetector;
         
         // Get global variables from Script 1
-        let templateImage = null;
-        let odiaFont = null;
         const generatorStatus = document.getElementById('generatorStatus');
         const generateBtn = document.getElementById('generateBtn');
         const templateInput = document.getElementById('templateInput');
@@ -378,11 +376,18 @@
         const cardCanvas = document.getElementById('cardCanvas');
         const ctx = cardCanvas.getContext('2d');
         
+        // Asset tracking object
+        const assets = {
+            template: null,
+            font: null,
+            aiModel: false
+        };
+        
         initializeFaceDetector();
         
         // --- AI Face Detector Setup ---
         async function initializeFaceDetector() {
-            generatorStatus.textContent = "Loading AI Face Model (this may take a moment)...";
+            updateStatus();
             try {
                 const filesetResolver = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
@@ -395,12 +400,14 @@
                     minDetectionConfidence: 0.5,
                     runningMode: "IMAGE"
                 });
-                generatorStatus.textContent = "AI Model Loaded. Please upload template and font.";
-                checkAssetsReady();
+                assets.aiModel = true;
+                updateStatus();
             } catch (e) {
                 console.error("Failed to load AI Model:", e);
-                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fail.";
-                checkAssetsReady(); 
+                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fallback to center-crop.";
+                // We can still enable it, it will just use the fallback crop
+                assets.aiModel = "failed"; // Mark as failed but ready
+                updateStatus(); 
             }
         }
         
@@ -408,28 +415,32 @@
             if (!text) return "";
             return text.toString().replace(/\d/g, digit => window.odiaDigits[digit]);
         }
-
-        // --- ID Card Generator Logic ---
-
-        function checkAssetsReady() {
-            if (templateImage && odiaFont && faceDetector) {
+        
+        function updateStatus() {
+            if (assets.template && assets.font && assets.aiModel) {
                 generateBtn.disabled = false;
-                generatorStatus.textContent = "Assets & AI Model loaded. Ready to generate cards.";
-            } else if (!faceDetector) {
-                generatorStatus.textContent = "AI Model is still loading..."
+                generatorStatus.textContent = "✅ Ready. You can now generate ID cards.";
+                return;
             }
+            
+            // Build the waiting message
+            let waitingFor = [];
+            if (!assets.template) waitingFor.push("Template");
+            if (!assets.font) waitingFor.push("Font");
+            if (!assets.aiModel) waitingFor.push("AI Model (Loading...)");
+            
+            generatorStatus.textContent = `Waiting for: ${waitingFor.join(', ')}`;
         }
 
         templateInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                templateImage = new Image();
-                templateImage.src = URL.createObjectURL(file);
-                templateImage.onload = () => {
-                    cardCanvas.width = templateImage.width;
-                    cardCanvas.height = templateImage.height;
-                    generatorStatus.textContent = "Template loaded. Waiting for font & AI...";
-                    checkAssetsReady();
+                assets.template = new Image();
+                assets.template.src = URL.createObjectURL(file);
+                assets.template.onload = () => {
+                    cardCanvas.width = assets.template.width;
+                    cardCanvas.height = assets.template.height;
+                    updateStatus();
                 };
             }
         });
@@ -439,11 +450,10 @@
             if (file) {
                 try {
                     const fontData = await file.arrayBuffer();
-                    odiaFont = new FontFace('OdiaFont', fontData);
-                    document.fonts.add(odiaFont);
-                    await odiaFont.load();
-                    generatorStatus.textContent = "Font loaded. Waiting for template & AI...";
-                    checkAssetsReady();
+                    assets.font = new FontFace('OdiaFont', fontData);
+                    document.fonts.add(assets.font);
+                    await assets.font.load();
+                    updateStatus();
                 } catch (err) {
                     console.error("Font load error:", err);
                     generatorStatus.textContent = "Error loading font file.";
@@ -452,8 +462,8 @@
         });
 
         generateBtn.addEventListener('click', async () => {
-            if (!templateImage || !odiaFont) { alert("Please upload both template and font files."); return; }
-            if (!faceDetector) { alert("AI Face Detector is not ready. Please wait."); return; }
+            if (!assets.template || !assets.font) { alert("Please upload both template and font files."); return; }
+            if (!assets.aiModel) { alert("AI Face Detector is not ready. Please wait."); return; }
 
             generatorStatus.textContent = "Starting generation... (This may take a while)";
             generateBtn.disabled = true;
@@ -504,7 +514,7 @@
 
                     // 2. Draw template
                     ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
-                    ctx.drawImage(templateImage, 0, 0);
+                    ctx.drawImage(assets.template, 0, 0);
 
                     // 3. Draw Photo
                     const px=222, py=250, pw=187, ph=225, border=3;
@@ -513,7 +523,7 @@
 
                     let sx=0, sy=0, sWidth=photo.width, sHeight=photo.height;
 
-                    if (photoLoaded) {
+                    if (photoLoaded && faceDetector && assets.aiModel !== "failed") {
                         const detections = faceDetector.detect(photo);
                         
                         if (detections.detections.length > 0) {
@@ -530,6 +540,7 @@
                             const new_y2 = Math.min(img_h, y2 + add_h / 2);
                             sx = new_x1; sy = new_y1; sWidth = new_x2 - new_x1; sHeight = new_y2 - new_y1;
                         } else {
+                            // No face, use center crop
                             const targetRatio = pw / ph;
                             const srcRatio = sWidth / sHeight;
                             if (srcRatio > targetRatio) {
@@ -540,8 +551,23 @@
                                 sy = (photo.height - sHeight) / 2;
                             }
                         }
+                    } else if (photoLoaded) {
+                        // AI Failed, use Center Crop
+                        const targetRatio = pw / ph;
+                        const srcRatio = sWidth / sHeight;
+                        if (srcRatio > targetRatio) {
+                            sWidth = sHeight * targetRatio;
+                            sx = (photo.width - sWidth) / 2;
+                        } else {
+                            sHeight = sWidth / targetRatio;
+                            sy = (photo.height - sHeight) / 2;
+                        }
+                    }
+                    
+                    if(photoLoaded) {
                         ctx.drawImage(photo, sx, sy, sWidth, sHeight, px, py, pw, ph);
                     } else {
+                        // Draw white placeholder
                         ctx.fillStyle = "white";
                         ctx.fillRect(px, py, pw, ph);
                     }
