@@ -430,9 +430,8 @@
     
     <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE - SLOW) -->
     <script type="module">
-        // ** THE FIX IS HERE **
-        // Import AI classes from the CORRECT path
-        const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/web/vision_bundle.js");
+        // ** THE FIX IS HERE - Using unpkg.com **
+        const { FaceDetector, FilesetResolver } = await import("https://unpkg.com/@mediapipe/tasks-vision@0.10.14/web/vision_bundle.js");
         let faceDetector;
         
         // Get global variables from Script 1
@@ -446,10 +445,9 @@
         // --- AI Face Detector Setup ---
         async function initializeFaceDetector() {
             try {
-                // ** THE FIX IS HERE **
-                // Load wasm files from the CORRECT path
+                // ** THE FIX IS HERE - Using unpkg.com **
                 const filesetResolver = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/web/wasm"
+                    "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/web/wasm"
                 );
                 faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
                     baseOptions: {
