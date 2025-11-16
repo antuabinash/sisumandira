@@ -12,10 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
     
-    <!-- Cropper.js Library (for Manual Crop) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-    
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f4f7f6; }
         h1, h2 { color: #0056b3; }
@@ -39,9 +35,7 @@
         button:disabled { background: #999; cursor: not-allowed; }
         
         #downloadZipBtn { background: #ffc107; color: #333; }
-        .delete-btn, .crop-btn { padding: 5px 8px; font-size: 12px; width: auto; margin-right: 5px; }
-        .delete-btn { background-color: #dc3545; color: white; }
-        .crop-btn { background-color: #17a2b8; color: white; } 
+        .delete-btn { padding: 5px 8px; font-size: 12px; width: auto; margin-right: 5px; background-color: #dc3545; color: white; }
         
         #generatorStatus { font-style: italic; color: #555; }
         .generator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -54,13 +48,6 @@
         .modal-buttons button { width: 48%; margin: 0; }
         #confirmYesBtn { background-color: #dc3545; color: white; }
         #confirmNoBtn { background-color: #6c757d; color: white; }
-
-        /* Cropper Modal Styles */
-        #cropModal .modal-content { max-width: 90vw; }
-        #cropImageContainer { width: 100%; max-height: 70vh; }
-        #cropImageContainer img { max-width: 100%; }
-        #saveCropBtn { background-color: #28a745; color: white; }
-        #cancelCropBtn { background-color: #6c757d; color: white; }
 
         /* small responsive tweaks */
         @media (max-width: 720px) {
@@ -130,22 +117,8 @@
             </div>
         </div>
     </div>
-    
-    <div id="cropModal" class="modal">
-        <div class="modal-content">
-            <h3>Crop Photo</h3>
-            <p>Set the photo to 187x225 (ID card ratio)</p>
-            <div id="cropImageContainer">
-                <img id="cropImage" src="">
-            </div>
-            <div class="modal-buttons">
-                <button id="saveCropBtn">Save Crop</button>
-                <button id="cancelCropBtn">Cancel</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- SCRIPT 1: DATA, TABLE, and CROP LOGIC (FAST) -->
+    <!-- SCRIPT 1: DATA, TABLE, and (CROPPING REMOVED) -->
     <script>
         // --- Asset tracking (global for both scripts) ---
         window.assets = {
@@ -163,13 +136,6 @@
         const confirmYesBtn = document.getElementById('confirmYesBtn');
         const confirmNoBtn = document.getElementById('confirmNoBtn');
         const confirmText = document.getElementById('confirmText');
-        
-        const cropModal = document.getElementById('cropModal');
-        const cropImage = document.getElementById('cropImage');
-        const saveCropBtn = document.getElementById('saveCropBtn');
-        const cancelCropBtn = document.getElementById('cancelCropBtn');
-        let cropper = null;
-        let idToCrop = null;
 
         let db; 
         let idToDelete = null; 
@@ -255,7 +221,6 @@
                     <td>${s.phone || '-'}</td>
                     <td>${s.schoolName}</td>
                     <td>
-                        <button class="crop-btn" data-id="${s.id}">Manual Crop</button>
                         <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
                     </td>
                 </tr>`;
@@ -269,22 +234,13 @@
             else renderTable(allStudents.filter(s => s.schoolName === val));
         });
 
-        // --- Delete & Crop Logic ---
+        // --- Delete Logic ---
         tableBody.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-btn')) {
                 idToDelete = e.target.dataset.id;
                 const name = e.target.dataset.name || 'this student';
                 confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
                 confirmModal.style.display = 'flex';
-            }
-            if (e.target.classList.contains('crop-btn')) {
-                idToCrop = e.target.dataset.id;
-                const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student && student.photoBase64) {
-                    openCropper(student.photoBase64);
-                } else {
-                    alert("No photo found for this student to crop.");
-                }
             }
         });
 
@@ -313,32 +269,6 @@
                 }).catch(console.error);
         }
         
-        // --- Manual Cropper.js Functions ---
-        
-        function openCropper(base64Image) {
-            if (cropper) cropper.destroy();
-            cropImage.src = base64Image;
-            cropModal.style.display = 'flex';
-            cropper = new Cropper(cropImage, { aspectRatio: 187 / 225, viewMode: 1, dragMode: 'move', autoCropArea: 0.8, movable: true, zoomable: true, rotatable: false, scalable: false });
-        }
-        cancelCropBtn.addEventListener('click', () => { cropModal.style.display = 'none'; if (cropper) cropper.destroy(); cropper = null; idToCrop = null; });
-        saveCropBtn.addEventListener('click', () => {
-            if (!cropper || !idToCrop) return;
-            saveCropBtn.disabled = true; saveCropBtn.textContent = "Saving...";
-            const croppedCanvas = cropper.getCroppedCanvas({ width: 187, height: 225, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
-            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); 
-            db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 })
-            .then(() => {
-                const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student) student.photoBase64 = newBase64;
-                const tableImg = document.getElementById(`img-${idToCrop}`);
-                if (tableImg) tableImg.src = newBase64;
-                saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop";
-                cancelCropBtn.click();
-            })
-            .catch((err) => { alert("Error saving crop: " + err.message); saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop"; });
-        });
-
         // --- Raw ZIP Download Logic ---
         document.getElementById('downloadZipBtn').addEventListener('click', async () => {
             if(allStudents.length === 0) return alert("No data");
