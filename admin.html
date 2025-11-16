@@ -377,61 +377,63 @@
             return new Promise(async (resolve, reject) => {
                 try {
                     // 1. Load student photo
-                    const photo = new Image();
-                    let photoLoaded = false;
-                    if (student.photoBase64) {
-                        photo.src = student.photoBase64;
-                        await new Promise((res, rej) => {
-                            photo.onload = () => { photoLoaded = true; res(); };
-                            photo.onerror = rej;
-                        });
-                    }
-
-                    // 2. Draw template
+// ... existing code ... -->
                     ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
                     ctx.drawImage(templateImage, 0, 0);
 
                     // 3. Draw Photo
                     const px=222, py=250, pw=187, ph=225, border=3;
+                    
+                    // First, draw the black border
+                    ctx.fillStyle = "black";
+                    ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
+
                     if (photoLoaded) {
-                        ctx.fillStyle = "black";
-                        ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
-                        ctx.drawImage(photo, px, py, pw, ph);
+                        // --- NEW: Smart "Center Crop" Logic ---
+                        const sWidth = photo.width;
+                        const sHeight = photo.height;
+                        const targetRatio = pw / ph; // 187 / 225
+                        const srcRatio = sWidth / sHeight;
+
+                        let sx = 0, sy = 0, new_sWidth = sWidth, new_sHeight = sHeight;
+
+                        if (srcRatio > targetRatio) {
+                            // Image is wider than target
+                            new_sWidth = sHeight * targetRatio;
+                            sx = (sWidth - new_sWidth) / 2;
+                        } else {
+                            // Image is taller than target
+                            new_sHeight = sWidth / targetRatio;
+                            sy = (sHeight - new_sHeight) / 2;
+                        }
+                        
+                        // Draw the cropped/zoomed image
+                        ctx.drawImage(photo, sx, sy, new_sWidth, new_sHeight, px, py, pw, ph);
+                        // --- END: Smart "Center Crop" Logic ---
                     } else {
-                        ctx.fillStyle = "black";
-                        ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
+                        // Draw white placeholder if photo failed
                         ctx.fillStyle = "white";
                         ctx.fillRect(px, py, pw, ph);
                     }
                     
                     // 4. Draw Text
-                    ctx.textBaseline = 'alphabetic';
+// ... existing code ... -->
                     ctx.fillStyle = "black";
                     ctx.font = "38px OdiaFont";
                     
-                    // MODIFIED: Use toOdia() for numeric fields
+                    // MODIFIED: Format DOB from YYYY-MM-DD to DD/MM/YYYY
+                    let formattedDob = student.dob || "";
+                    try {
+                        const [year, month, day] = student.dob.split('-');
+                        formattedDob = `${day}/${month}/${year}`;
+                    } catch(e) { /* fallback to original if parsing fails */ }
+
                     ctx.fillText(student.name || "", 227, 505 + 38);
                     ctx.fillText(student.class || "", 227, 575 + 38);
-                    ctx.fillText(toOdia(student.dob) || "", 227, 647 + 38);
+                    // MODIFIED: Use the new formattedDob, and NO toOdia() wrapper
+                    ctx.fillText(formattedDob, 227, 647 + 38); 
                     ctx.fillText(toOdia(student.roll) || "", 227, 718 + 38);
                     ctx.fillText(toOdia(student.phone) || "", 227, 789 + 38);
 
                     // 5. Draw Blood Group (different color/size)
-                    if (student.bloodGroup) {
-                        ctx.fillStyle = "white";
-                        ctx.font = "23px OdiaFont";
-                        ctx.fillText(student.bloodGroup, 480, 360 + 23);
-                    }
-                    
-                    // 6. Resolve with the final image blob
-                    cardCanvas.toBlob(resolve, 'image/png');
-
-                } catch (err) {
-                    reject(err);
-                }
-            });
-        }
-
-    </script>
-</body>
-</html>
+// ... existing code ... -->
