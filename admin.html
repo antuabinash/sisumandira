@@ -14,94 +14,96 @@
     
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-        h1 { color: #0056b3; }
+        h1, h2 { color: #0056b3; }
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
         th { background: #0056b3; color: white; }
         img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
-        .controls { margin-bottom: 20px; display: flex; gap: 10px; }
-        select, button { padding: 10px; font-size: 16px; }
-        button { background: #28a745; color: white; border: none; cursor: pointer; border-radius: 4px; }
-        #downloadZipBtn { background: #ffc107; color: #333; }
         
-        .delete-btn {
-            background-color: #dc3545;
-            color: white;
-            padding: 5px 8px;
-            font-size: 12px;
-            width: auto;
+        .card {
+            max-width: 1000px;
+            margin: 0 auto 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        select, button, input[type="file"] { padding: 10px; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; }
+        button:disabled { background: #999; cursor: not-allowed; }
+        
+        #downloadZipBtn { background: #ffc107; color: #333; }
+        .delete-btn { background-color: #dc3545; color: white; padding: 5px 8px; font-size: 12px; width: auto; }
+        #generatorStatus { font-style: italic; color: #555; }
+        
+        /* Generator Grid */
+        .generator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        #generateBtn { background-color: #007bff; grid-column: 1 / -1; } /* Spans full width */
+        
         /* Confirmation Modal */
-        #confirmModal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-content {
-            background-color: #fff;
-            padding: 20px 30px;
-            border-radius: 8px;
-            text-align: center;
-            max-width: 300px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        .modal-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-        }
-        .modal-buttons button {
-            width: 48%;
-            margin: 0;
-        }
-        #confirmYesBtn {
-            background-color: #dc3545;
-            color: white;
-        }
-        #confirmNoBtn {
-            background-color: #6c757d;
-            color: white;
-        }
+        #confirmModal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fff; padding: 20px 30px; border-radius: 8px; text-align: center; max-width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-buttons { display: flex; justify-content: space-between; margin-top: 20px; }
+        .modal-buttons button { width: 48%; margin: 0; }
+        #confirmYesBtn { background-color: #dc3545; color: white; }
+        #confirmNoBtn { background-color: #6c757d; color: white; }
     </style>
 </head>
 <body>
     <h1>Admin Panel: Student Data</h1>
     
-    <div class="controls">
-        <select id="schoolFilter">
-            <option value="all">All Schools</option>
-        </select>
-        <button id="refreshBtn">Refresh Data</button>
-        <button id="downloadZipBtn">Download All Photos & Excel (ZIP)</button>
+    <!-- NEW: ID Card Generator Section -->
+    <div class="card">
+        <h2>ID Card Generator</h2>
+        <div class="generator-grid">
+            <div>
+                <label for="templateInput">1. Upload Template (.png)</label>
+                <input type="file" id="templateInput" accept="image/png" style="width:100%;">
+            </div>
+            <div>
+                <label for="fontInput">2. Upload Odia Font (.ttf)</label>
+                <input type="file" id="fontInput" accept=".ttf,.otf,font/ttf,font/otf" style="width:100%;">
+            </div>
+            <button id="generateBtn" disabled>Generate & Download ID Cards</button>
+        </div>
+        <p id="generatorStatus">Please upload a template and font file to begin.</p>
     </div>
 
-    <table id="studentTable">
-        <thead>
-            <tr>
-                <th>Photo</th>
-                <th>Name</th>
-                <th>Class</th>
-                <th>Roll</th>
-                <th>DOB</th>
-                <th>Blood</th>
-                <th>Phone</th> <!-- MODIFIED: Added Phone Column -->
-                <th>School</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- MODIFIED: Colspan changed from 8 to 9 -->
-            <tr><td colspan="9">Loading data...</td></tr>
-        </tbody>
-    </table>
+    <!-- Data Section -->
+    <div class="card">
+        <h2>Student Data</h2>
+        <div class="controls">
+            <select id="schoolFilter">
+                <option value="all">All Schools</option>
+            </select>
+            <button id="refreshBtn">Refresh Data</button>
+            <button id="downloadZipBtn">Download Raw Backup (ZIP)</button>
+        </div>
+
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Roll</th>
+                    <th>DOB</th>
+                    <th>Blood</th>
+                    <th>Phone</th>
+                    <th>School</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="9">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Hidden Canvas for drawing -->
+    <canvas id="cardCanvas" style="display: none;"></canvas>
 
     <!-- Confirmation Modal HTML -->
     <div id="confirmModal">
@@ -126,6 +128,17 @@
         
         let db; 
         let idToDelete = null; 
+        
+        // --- NEW: Generator variables ---
+        let templateImage = null;
+        let odiaFont = null;
+        const generatorStatus = document.getElementById('generatorStatus');
+        const generateBtn = document.getElementById('generateBtn');
+        const templateInput = document.getElementById('templateInput');
+        const fontInput = document.getElementById('fontInput');
+        const cardCanvas = document.getElementById('cardCanvas');
+        const ctx = cardCanvas.getContext('2d');
+
 
         try {
             // YOUR SPECIFIC KEYS EMBEDDED HERE
@@ -146,7 +159,6 @@
         } catch (e) { alert("Firebase Error: " + e.message); }
 
         function loadData(db) {
-            // MODIFIED: Colspan changed from 8 to 9
             tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
             db.collection("students").orderBy("submittedAt", "desc").get().then((querySnapshot) => {
                 allStudents = [];
@@ -169,7 +181,6 @@
                 renderTable(allStudents);
             }).catch((error) => {
                 console.log("Error getting documents: ", error);
-                // MODIFIED: Colspan changed from 8 to 9
                 tableBody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
             });
         }
@@ -178,7 +189,6 @@
             tableBody.innerHTML = '';
             data.forEach(s => {
                 const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
-                // MODIFIED: Added Phone field
                 const row = `<tr>
                     <td><img src="${photoSrc}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
                     <td>${s.name}</td>
@@ -186,7 +196,7 @@
                     <td>${s.roll}</td>
                     <td>${s.dob}</td>
                     <td>${s.bloodGroup || '-'}</td>
-                    <td>${s.phone || '-'}</td> <!-- ADDED -->
+                    <td>${s.phone || '-'}</td>
                     <td>${s.schoolName}</td>
                     <td><button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button></td>
                 </tr>`;
@@ -225,21 +235,16 @@
 
         function deleteStudent(id) {
             if (!db) return;
-            
             db.collection("students").doc(id.toString()).delete()
                 .then(() => {
-                    console.log("Document successfully deleted from Firebase!");
                     allStudents = allStudents.filter(s => s.id.toString() !== id);
                     const val = schoolFilter.value;
                     if (val === 'all') renderTable(allStudents);
                     else renderTable(allStudents.filter(s => s.schoolName === val));
-                }).catch((error) => {
-                    console.error("Error removing document: ", error);
-                });
+                }).catch(console.error);
         }
-        // --- END: Delete Logic ---
-
-
+        
+        // --- Raw ZIP Download Logic ---
         document.getElementById('downloadZipBtn').addEventListener('click', async () => {
             if(allStudents.length === 0) return alert("No data");
             const btn = document.getElementById('downloadZipBtn');
@@ -250,14 +255,9 @@
             
             try {
                 const zip = new JSZip();
-                
                 dataToExport.forEach(s => {
                     if(s.photoBase64) {
-                        const byteString = atob(s.photoBase64.split(',')[1]);
-                        const ab = new ArrayBuffer(byteString.length);
-                        const ia = new Uint8Array(ab);
-                        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-                        zip.file(s.newPhotoName, new Blob([ab], {type: 'image/jpeg'}));
+                        zip.file(s.newPhotoName, s.photoBase64.split(',')[1], {base64: true});
                     }
                 });
                 
@@ -267,10 +267,8 @@
                 });
                 const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
                 const wb = XLSX.utils.book_new(); 
-                
                 let sheetName = (val === 'all' ? 'All_Schools' : val).replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
                 XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                
                 const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
                 zip.file('student_data.xlsx', excelBlob);
 
@@ -283,9 +281,155 @@
                 console.error(e);
                 alert("Error creating zip: " + e.message);
             } finally {
-                btn.disabled = false; btn.textContent = "Download All Photos & Excel (ZIP)";
+                btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
             }
         });
+
+
+        // --- NEW: ID Card Generator Logic ---
+
+        function checkAssetsReady() {
+            if (templateImage && odiaFont) {
+                generateBtn.disabled = false;
+                generatorStatus.textContent = "Assets loaded. Ready to generate cards.";
+            }
+        }
+
+        templateInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                templateImage = new Image();
+                templateImage.src = URL.createObjectURL(file);
+                templateImage.onload = () => {
+                    cardCanvas.width = templateImage.width;
+                    cardCanvas.height = templateImage.height;
+                    generatorStatus.textContent = "Template loaded. Waiting for font...";
+                    checkAssetsReady();
+                };
+            }
+        });
+
+        fontInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    const fontData = await file.arrayBuffer();
+                    odiaFont = new FontFace('OdiaFont', fontData);
+                    document.fonts.add(odiaFont);
+                    await odiaFont.load();
+                    generatorStatus.textContent = "Font loaded. Waiting for template...";
+                    checkAssetsReady();
+                } catch (err) {
+                    console.error("Font load error:", err);
+                    generatorStatus.textContent = "Error loading font file.";
+                }
+            }
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            if (!templateImage || !odiaFont) {
+                alert("Please upload both template and font files.");
+                return;
+            }
+
+            generatorStatus.textContent = "Starting generation... (This may take a while)";
+            generateBtn.disabled = true;
+
+            const val = schoolFilter.value;
+            const dataToGenerate = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            const zip = new JSZip();
+            let count = 0;
+
+            for (const student of dataToGenerate) {
+                try {
+                    const cardBlob = await generateCard(student);
+                    const filename = `${student.name.replace(/ /g, '_')}_${student.roll}.png`;
+                    zip.file(filename, cardBlob);
+                    count++;
+                    generatorStatus.textContent = `Generated card ${count} of ${dataToGenerate.length}...`;
+                } catch (err) {
+                    console.error(`Failed to generate card for ${student.name}:`, err);
+                }
+            }
+
+            generatorStatus.textContent = `Zipping ${count} cards...`;
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+            const link = document.createElement('a');
+            const schoolName = (val === 'all' ? 'All_Schools' : val);
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `ID_Cards_${schoolName}.zip`;
+            link.click();
+
+            generatorStatus.textContent = `Done! Generated ${count} cards. Ready for next batch.`;
+            generateBtn.disabled = false;
+        });
+
+        function generateCard(student) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    // 1. Load student photo (or create placeholder)
+                    const photo = new Image();
+                    let photoLoaded = false;
+                    if (student.photoBase64) {
+                        photo.src = student.photoBase64;
+                        await new Promise((res, rej) => {
+                            photo.onload = () => { photoLoaded = true; res(); };
+                            photo.onerror = rej;
+                        });
+                    }
+
+                    // 2. Draw template
+                    ctx.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
+                    ctx.drawImage(templateImage, 0, 0);
+
+                    // 3. Draw Photo (with border)
+                    // Coordinates from your Python script:
+                    // PHOTO_COORDS = (222, 250), PHOTO_SIZE = (187, 225), BORDER = 3
+                    const px=222, py=250, pw=187, ph=225, border=3;
+                    
+                    if (photoLoaded) {
+                        ctx.fillStyle = "black";
+                        ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
+                        ctx.drawImage(photo, px, py, pw, ph);
+                    } else {
+                        // Draw placeholder if photo failed
+                        ctx.fillStyle = "black";
+                        ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(px, py, pw, ph);
+                    }
+                    
+                    // 4. Draw Text
+                    // Using the adjusted Y coordinates from your script (e.g., NAME_Y_ADJUSTED)
+                    // This sets the font *baseline*, which is what canvas fillText uses
+                    
+                    ctx.textBaseline = 'alphabetic'; // Use the font baseline
+                    ctx.fillStyle = "black";
+                    ctx.font = "38px OdiaFont";
+                    
+                    ctx.fillText(student.name || "", 227, 505 + 38);
+                    ctx.fillText(student.class || "", 227, 575 + 38);
+                    ctx.fillText(student.dob || "", 227, 647 + 38);
+                    ctx.fillText(student.roll || "", 227, 718 + 38);
+                    ctx.fillText(student.phone || "", 227, 789 + 38);
+
+                    // 5. Draw Blood Group (different color/size)
+                    if (student.bloodGroup) {
+                        ctx.fillStyle = "white";
+                        ctx.font = "23px OdiaFont";
+                        ctx.fillText(student.bloodGroup, 480, 360 + 23);
+                    }
+                    
+                    // 6. Resolve with the final image blob
+                    cardCanvas.toBlob(resolve, 'image/png');
+
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
     </script>
 </body>
 </html>
