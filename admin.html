@@ -233,7 +233,9 @@
 
         function loadData(db) {
             tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
-            db.collection("students").orderBy("submittedAt", "desc").get().then((querySnapshot) => {
+            
+            // FIX: Removed .orderBy("submittedAt", "desc") to avoid needing an index
+            db.collection("students").get().then((querySnapshot) => {
                 allStudents = [];
                 const schools = new Set();
                 
@@ -243,6 +245,9 @@
                     if(s.schoolName) schools.add(s.schoolName);
                 });
                 
+                // FIX: Sort in JavaScript AFTER fetching
+                allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
+
                 schoolFilter.innerHTML = '<option value="all">All Schools</option>';
                 schools.forEach(school => {
                     const opt = document.createElement('option');
@@ -260,170 +265,10 @@
 
         function renderTable(data) {
             tableBody.innerHTML = '';
-            data.forEach(s => {
-                const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
-                const row = `<tr>
-                    <td><img src="${photoSrc}" id="img-${s.id}" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
-                    <td>${s.name}</td>
-                    <td>${s.class}</td>
-                    <td>${s.roll}</td>
-                    <td>${s.dob}</td>
-                    <td>${s.bloodGroup || '-'}</td>
-                    <td>${s.phone || '-'}</td>
-                    <td>${s.schoolName}</td>
-                    <td>
-                        <button class="crop-btn" data-id="${s.id}">Manual Crop</button>
-                        <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
-                    </td>
-                </tr>`;
-                tableBody.innerHTML += row;
-            });
-        }
-        
-        schoolFilter.addEventListener('change', () => {
-            const val = schoolFilter.value;
-            if (val === 'all') renderTable(allStudents);
-            else renderTable(allStudents.filter(s => s.schoolName === val));
-        });
-
-        // --- Delete & Crop Logic ---
-        tableBody.addEventListener('click', (e) => {
-            if (e.target.classList.contains('delete-btn')) {
-                idToDelete = e.target.dataset.id;
-                const name = e.target.dataset.name || 'this student';
-                confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
-                confirmModal.style.display = 'flex';
+            if (data.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="9">No data found.</td></tr>';
+                 return;
             }
-            if (e.target.classList.contains('crop-btn')) {
-                idToCrop = e.target.dataset.id;
-                const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student && student.photoBase64) {
-                    openCropper(student.photoBase64);
-                } else {
-                    alert("No photo found for this student to crop.");
-                }
-            }
-        });
-
-        confirmNoBtn.addEventListener('click', () => {
-            confirmModal.style.display = 'none';
-            idToDelete = null;
-        });
-
-        confirmYesBtn.addEventListener('click', () => {
-            if (idToDelete) {
-                deleteStudent(idToDelete);
-            }
-            confirmModal.style.display = 'none';
-            idToDelete = null;
-        });
-
-        function deleteStudent(id) {
-            if (!db) return;
-            db.collection("students").doc(id.toString()).delete()
-                .then(() => {
-                    allStudents = allStudents.filter(s => s.id.toString() !== id);
-                    const val = schoolFilter.value;
-                    if (val === 'all') renderTable(allStudents);
-                    else renderTable(allStudents.filter(s => s.schoolName === val));
-                }).catch(console.error);
-        }
-        
-        // --- Manual Cropper.js Functions ---
-        
-        function openCropper(base64Image) {
-            if (cropper) cropper.destroy();
-            cropImage.src = base64Image;
-            cropModal.style.display = 'flex';
-            cropper = new Cropper(cropImage, { aspectRatio: 187 / 225, viewMode: 1, dragMode: 'move', autoCropArea: 0.8, movable: true, zoomable: true, rotatable: false, scalable: false });
-        }
-        cancelCropBtn.addEventListener('click', () => { cropModal.style.display = 'none'; if (cropper) cropper.destroy(); cropper = null; idToCrop = null; });
-        saveCropBtn.addEventListener('click', () => {
-            if (!cropper || !idToCrop) return;
-            saveCropBtn.disabled = true; saveCropBtn.textContent = "Saving...";
-            const croppedCanvas = cropper.getCroppedCanvas({ width: 187, height: 225, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
-            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); 
-            db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 })
-            .then(() => {
-                const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student) student.photoBase64 = newBase64;
-                const tableImg = document.getElementById(`img-${idToCrop}`);
-                if (tableImg) tableImg.src = newBase64;
-                saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop";
-                cancelCropBtn.click();
-            })
-            .catch((err) => { alert("Error saving crop: "T"G-PXVV87C78S"
-            };
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore(); 
-            
-            loadData(db);
-            document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
-            
-            // NEW: Initialize the AI Face Detector
-            initializeFaceDetector();
-
-        } catch (e) { alert("Firebase Error: " + e.message); }
-        
-        // --- NEW: AI Face Detector Setup ---
-        async function initializeFaceDetector() {
-            generatorStatus.textContent = "Loading AI Face Model (this may take a moment)...";
-            try {
-                const filesetResolver = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-                );
-                faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
-                        delegate: "GPU" // Use GPU on PC
-                    },
-                    minDetectionConfidence: 0.5,
-                    runningMode: "IMAGE"
-                });
-                generatorStatus.textContent = "AI Model Loaded. Please upload template and font.";
-                checkAssetsReady();
-            } catch (e) {
-                console.error("Failed to load AI Model:", e);
-                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fail.";
-                // We can still enable it, it will just use the fallback crop
-                checkAssetsReady(); 
-            }
-        }
-        
-        function toOdia(text) {
-            if (!text) return "";
-            return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
-        }
-
-        function loadData(db) {
-            tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
-            db.collection("students").orderBy("submittedAt", "desc").get().then((querySnapshot) => {
-                allStudents = [];
-                const schools = new Set();
-                
-                querySnapshot.forEach((doc) => {
-                    const s = doc.data();
-                    allStudents.push(s);
-                    if(s.schoolName) schools.add(s.schoolName);
-                });
-                
-                schoolFilter.innerHTML = '<option value="all">All Schools</option>';
-                schools.forEach(school => {
-                    const opt = document.createElement('option');
-                    opt.value = school;
-                    opt.textContent = school;
-                    schoolFilter.appendChild(opt);
-                });
-                
-                renderTable(allStudents);
-            }).catch((error) => {
-                console.log("Error getting documents: ", error);
-                tableBody.innerHTML = `<tr><td colspan="9">Error: ${error.message}</td></tr>`;
-            });
-        }
-
-        function renderTable(data) {
-            tableBody.innerHTML = '';
             data.forEach(s => {
                 const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=ERR';
                 const row = `<tr>
