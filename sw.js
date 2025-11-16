@@ -1,5 +1,5 @@
 // UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v18-load-fix';
+const CACHE_NAME = 'student-data-cache-v19-decouple-fix';
 
 const urlsToCache = [
   './',
