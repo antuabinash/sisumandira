@@ -212,6 +212,7 @@
                     if(s.schoolName) schools.add(s.schoolName);
                 });
                 
+                // Sort in JavaScript, not in the query
                 allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
                 window.allStudents = allStudents; // Share with module
 
@@ -429,8 +430,9 @@
     
     <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE - SLOW) -->
     <script type="module">
-        // Import AI classes
-        const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
+        // ** THE FIX IS HERE **
+        // Import AI classes from the CORRECT path
+        const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/web/vision_bundle.js");
         let faceDetector;
         
         // Get global variables from Script 1
@@ -444,8 +446,10 @@
         // --- AI Face Detector Setup ---
         async function initializeFaceDetector() {
             try {
+                // ** THE FIX IS HERE **
+                // Load wasm files from the CORRECT path
                 const filesetResolver = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/web/wasm"
                 );
                 faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
                     baseOptions: {
@@ -460,7 +464,6 @@
                 window.updateStatus();
             } catch (e) {
                 console.error("Failed to load AI Model:", e);
-                // NEW: Alert the user!
                 alert("CRITICAL ERROR: The AI Face Detector failed to load. This can be caused by ad-blockers or network issues. The generator will use simple 'Center Crop' as a fallback. Error: " + e.message);
                 window.assets.aiModel = "failed"; // Mark as failed but ready
                 window.updateStatus();
