@@ -12,14 +12,12 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
     
-    <!-- Cropper.js Library -->
+    <!-- Cropper.js Library (for Manual Crop) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     
-    <!-- NEW: MediaPipe AI Face Detector (Loaded in a module script) -->
-    
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f4f7f6; }
         h1, h2 { color: #0056b3; }
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
@@ -35,7 +33,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
-        .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         select, button, input[type="file"] { padding: 10px; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; }
         button { background: #28a745; color: white; border: none; cursor: pointer; }
         button:disabled { background: #999; cursor: not-allowed; }
@@ -81,7 +79,8 @@
             </div>
             <button id="generateBtn" disabled>Generate & Download ID Cards</button>
         </div>
-        <p id="generatorStatus">Waiting for: Template, Font, AI Model (Loading...)</p>
+        <!-- UPDATED: Smart status bar -->
+        <p id="generatorStatus">Status: ❌ Template, ❌ Font, ⏳ AI Model...</p>
     </div>
 
     <div class="card">
@@ -190,6 +189,7 @@
         function loadData(db) {
             tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
             
+            // FIXED: Removed .orderBy() to prevent index error
             db.collection("students").get().then((querySnapshot) => {
                 allStudents = [];
                 const schools = new Set();
@@ -200,6 +200,7 @@
                     if(s.schoolName) schools.add(s.schoolName);
                 });
                 
+                // FIXED: Sort in JavaScript, not in the query
                 allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
                 window.allStudents = allStudents; // Share with module
 
@@ -380,7 +381,7 @@
         const assets = {
             template: null,
             font: null,
-            aiModel: false
+            aiModel: "pending" // 'pending', 'loaded', 'failed'
         };
         
         initializeFaceDetector();
@@ -400,12 +401,12 @@
                     minDetectionConfidence: 0.5,
                     runningMode: "IMAGE"
                 });
-                assets.aiModel = true;
+                assets.aiModel = "loaded";
+                console.log("AI Model Loaded");
                 updateStatus();
             } catch (e) {
                 console.error("Failed to load AI Model:", e);
                 generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fallback to center-crop.";
-                // We can still enable it, it will just use the fallback crop
                 assets.aiModel = "failed"; // Mark as failed but ready
                 updateStatus(); 
             }
@@ -416,20 +417,22 @@
             return text.toString().replace(/\d/g, digit => window.odiaDigits[digit]);
         }
         
+        // --- UPDATED: Smart checklist status ---
         function updateStatus() {
-            if (assets.template && assets.font && assets.aiModel) {
+            const templateStatus = assets.template ? '✅ Template' : '❌ Template';
+            const fontStatus = assets.font ? '✅ Font' : '❌ Font';
+            let aiStatus = '⏳ AI Model...';
+            if (assets.aiModel === "loaded") aiStatus = '✅ AI Model';
+            if (assets.aiModel === "failed") aiStatus = '⚠️ AI (Fallback)';
+
+            generatorStatus.textContent = `Status: ${templateStatus}, ${fontStatus}, ${aiStatus}`;
+
+            if (assets.template && assets.font && (assets.aiModel === "loaded" || assets.aiModel === "failed")) {
                 generateBtn.disabled = false;
-                generatorStatus.textContent = "✅ Ready. You can now generate ID cards.";
-                return;
+                generatorStatus.textContent = `✅ Ready. You can now generate ID cards.`;
+            } else {
+                generateBtn.disabled = true;
             }
-            
-            // Build the waiting message
-            let waitingFor = [];
-            if (!assets.template) waitingFor.push("Template");
-            if (!assets.font) waitingFor.push("Font");
-            if (!assets.aiModel) waitingFor.push("AI Model (Loading...)");
-            
-            generatorStatus.textContent = `Waiting for: ${waitingFor.join(', ')}`;
         }
 
         templateInput.addEventListener('change', (e) => {
@@ -440,6 +443,7 @@
                 assets.template.onload = () => {
                     cardCanvas.width = assets.template.width;
                     cardCanvas.height = assets.template.height;
+                    console.log("Template Loaded");
                     updateStatus();
                 };
             }
@@ -453,6 +457,7 @@
                     assets.font = new FontFace('OdiaFont', fontData);
                     document.fonts.add(assets.font);
                     await assets.font.load();
+                    console.log("Font Loaded");
                     updateStatus();
                 } catch (err) {
                     console.error("Font load error:", err);
@@ -463,7 +468,7 @@
 
         generateBtn.addEventListener('click', async () => {
             if (!assets.template || !assets.font) { alert("Please upload both template and font files."); return; }
-            if (!assets.aiModel) { alert("AI Face Detector is not ready. Please wait."); return; }
+            if (assets.aiModel === "pending") { alert("AI Face Detector is not ready. Please wait."); return; }
 
             generatorStatus.textContent = "Starting generation... (This may take a while)";
             generateBtn.disabled = true;
@@ -523,7 +528,7 @@
 
                     let sx=0, sy=0, sWidth=photo.width, sHeight=photo.height;
 
-                    if (photoLoaded && faceDetector && assets.aiModel !== "failed") {
+                    if (photoLoaded && faceDetector && assets.aiModel === "loaded") {
                         const detections = faceDetector.detect(photo);
                         
                         if (detections.detections.length > 0) {
@@ -552,7 +557,7 @@
                             }
                         }
                     } else if (photoLoaded) {
-                        // AI Failed, use Center Crop
+                        // AI Failed or not loaded, use Center Crop
                         const targetRatio = pw / ph;
                         const srcRatio = sWidth / sHeight;
                         if (srcRatio > targetRatio) {
@@ -583,6 +588,7 @@
                         formattedDob = `${day}/${month}/${year}`;
                     } catch(e) { /* fallback */ }
 
+                    // FIXED: Apply Odia numbers to all numeric fields
                     ctx.fillText(student.name || "", 227, 505 + 38);
                     ctx.fillText(student.class || "", 227, 575 + 38);
                     ctx.fillText(toOdia(formattedDob), 227, 647 + 38); 
