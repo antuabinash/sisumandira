@@ -1,5 +1,5 @@
 // UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v12-card-gen';
+const CACHE_NAME = 'student-data-cache-v13-odia-text';
 
 const urlsToCache = [
   './',
