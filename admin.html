@@ -16,9 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     
-    <!-- NEW: MediaPipe AI Face Detector -->
-    <!-- This loads the full AI vision library -->
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"></script>
+    <!-- NEW: MediaPipe AI Face Detector (Loaded in a module script) -->
     
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
@@ -142,13 +140,8 @@
         </div>
     </div>
 
-    <script type="module">
-        // This MUST be a module script to use MediaPipe
-        
-        // Import AI classes
-        const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
-        let faceDetector;
-
+    <!-- SCRIPT 1: DATA, TABLE, and CROP LOGIC (FAST) -->
+    <script>
         let allStudents = [];
         const tableBody = document.querySelector('#studentTable tbody');
         const schoolFilter = document.getElementById('schoolFilter');
@@ -168,17 +161,12 @@
         let db; 
         let idToDelete = null; 
         
-        let templateImage = null;
-        let odiaFont = null;
-        const generatorStatus = document.getElementById('generatorStatus');
-        const generateBtn = document.getElementById('generateBtn');
-        const templateInput = document.getElementById('templateInput');
-        const fontInput = document.getElementById('fontInput');
-        const cardCanvas = document.getElementById('cardCanvas');
-        const ctx = cardCanvas.getContext('2d');
+        // Make these global so the module script can see them
+        window.allStudents = [];
+        window.db = null;
+        window.schoolFilter = schoolFilter;
+        window.odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
         
-        const odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
-
         try {
             // YOUR SPECIFIC KEYS EMBEDDED HERE
             const firebaseConfig = {
@@ -192,49 +180,16 @@
             };
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore(); 
+            window.db = db; // Share with module
             
             loadData(db);
             document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
-            
-            // NEW: Initialize the AI Face Detector
-            initializeFaceDetector();
 
         } catch (e) { alert("Firebase Error: " + e.message); }
         
-        // --- NEW: AI Face Detector Setup ---
-        async function initializeFaceDetector() {
-            generatorStatus.textContent = "Loading AI Face Model (this may take a moment)...";
-            try {
-                const filesetResolver = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-                );
-                faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
-                        delegate: "GPU" // Use GPU on PC
-                    },
-                    minDetectionConfidence: 0.5,
-                    runningMode: "IMAGE"
-                });
-                generatorStatus.textContent = "AI Model Loaded. Please upload template and font.";
-                checkAssetsReady();
-            } catch (e) {
-                console.error("Failed to load AI Model:", e);
-                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fail.";
-                // We can still enable it, it will just use the fallback crop
-                checkAssetsReady(); 
-            }
-        }
-        
-        function toOdia(text) {
-            if (!text) return "";
-            return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
-        }
-
         function loadData(db) {
             tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
             
-            // FIX: Removed .orderBy("submittedAt", "desc") to avoid needing an index
             db.collection("students").get().then((querySnapshot) => {
                 allStudents = [];
                 const schools = new Set();
@@ -245,8 +200,8 @@
                     if(s.schoolName) schools.add(s.schoolName);
                 });
                 
-                // FIX: Sort in JavaScript AFTER fetching
                 allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
+                window.allStudents = allStudents; // Share with module
 
                 schoolFilter.innerHTML = '<option value="all">All Schools</option>';
                 schools.forEach(school => {
@@ -332,6 +287,7 @@
             db.collection("students").doc(id.toString()).delete()
                 .then(() => {
                     allStudents = allStudents.filter(s => s.id.toString() !== id);
+                    window.allStudents = allStudents; // Update global
                     const val = schoolFilter.value;
                     if (val === 'all') renderTable(allStudents);
                     else renderTable(allStudents.filter(s => s.schoolName === val));
@@ -404,12 +360,58 @@
                 btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
             }
         });
-
+    </script>
+    
+    <!-- SCRIPT 2: AI GENERATOR LOGIC (MODULE) -->
+    <script type="module">
+        // Import AI classes
+        const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
+        let faceDetector;
+        
+        // Get global variables from Script 1
+        let templateImage = null;
+        let odiaFont = null;
+        const generatorStatus = document.getElementById('generatorStatus');
+        const generateBtn = document.getElementById('generateBtn');
+        const templateInput = document.getElementById('templateInput');
+        const fontInput = document.getElementById('fontInput');
+        const cardCanvas = document.getElementById('cardCanvas');
+        const ctx = cardCanvas.getContext('2d');
+        
+        initializeFaceDetector();
+        
+        // --- AI Face Detector Setup ---
+        async function initializeFaceDetector() {
+            generatorStatus.textContent = "Loading AI Face Model (this may take a moment)...";
+            try {
+                const filesetResolver = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                );
+                faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+                        delegate: "GPU" // Use GPU on PC
+                    },
+                    minDetectionConfidence: 0.5,
+                    runningMode: "IMAGE"
+                });
+                generatorStatus.textContent = "AI Model Loaded. Please upload template and font.";
+                checkAssetsReady();
+            } catch (e) {
+                console.error("Failed to load AI Model:", e);
+                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fail.";
+                checkAssetsReady(); 
+            }
+        }
+        
+        function toOdia(text) {
+            if (!text) return "";
+            return text.toString().replace(/\d/g, digit => window.odiaDigits[digit]);
+        }
 
         // --- ID Card Generator Logic ---
 
         function checkAssetsReady() {
-            // MODIFIED: Check for AI model
             if (templateImage && odiaFont && faceDetector) {
                 generateBtn.disabled = false;
                 generatorStatus.textContent = "Assets & AI Model loaded. Ready to generate cards.";
@@ -456,14 +458,13 @@
             generatorStatus.textContent = "Starting generation... (This may take a while)";
             generateBtn.disabled = true;
 
-            const val = schoolFilter.value;
-            const dataToGenerate = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            const val = window.schoolFilter.value;
+            const dataToGenerate = (val === 'all') ? window.allStudents : window.allStudents.filter(s => s.schoolName === val);
             const zip = new JSZip();
             let count = 0;
 
             for (const student of dataToGenerate) {
                 try {
-                    // This now runs the AI crop
                     const cardBlob = await generateCard(student); 
                     const filename = `${student.name.replace(/ /g, '_')}_${student.roll}.png`;
                     zip.file(filename, cardBlob);
@@ -487,7 +488,6 @@
             generateBtn.disabled = false;
         });
 
-        // --- MODIFIED: generateCard function with AI CROP ---
         function generateCard(student) {
             return new Promise(async (resolve, reject) => {
                 try {
@@ -514,34 +514,22 @@
                     let sx=0, sy=0, sWidth=photo.width, sHeight=photo.height;
 
                     if (photoLoaded) {
-                        // --- NEW: AI Face Crop Logic ---
                         const detections = faceDetector.detect(photo);
                         
                         if (detections.detections.length > 0) {
-                            // AI FOUND A FACE
                             const bbox = detections.detections[0].boundingBox;
                             const img_w = photo.width, img_h = photo.height;
-                            
                             let x1 = bbox.originX, y1 = bbox.originY;
                             let x2 = bbox.originX + bbox.width, y2 = bbox.originY + bbox.height;
-                            
-                            // Replicate Python expand_bbox logic
                             const bw = x2 - x1, bh = y2 - y1;
-                            const add_w = parseInt(bw * 0.6); // expand_x=0.6
-                            const add_h = parseInt(bh * 1.4); // expand_y=1.4
-
+                            const add_w = parseInt(bw * 0.6); 
+                            const add_h = parseInt(bh * 1.4); 
                             const new_x1 = Math.max(0, x1 - add_w / 2);
-                            const new_y1 = Math.max(0, y1 - add_h / 2); // 'center' anchor
+                            const new_y1 = Math.max(0, y1 - add_h / 2); 
                             const new_x2 = Math.min(img_w, x2 + add_w / 2);
                             const new_y2 = Math.min(img_h, y2 + add_h / 2);
-
-                            sx = new_x1;
-                            sy = new_y1;
-                            sWidth = new_x2 - new_x1;
-                            sHeight = new_y2 - new_y1;
-                            
+                            sx = new_x1; sy = new_y1; sWidth = new_x2 - new_x1; sHeight = new_y2 - new_y1;
                         } else {
-                            // NO FACE FOUND: Use Center Crop Fallback
                             const targetRatio = pw / ph;
                             const srcRatio = sWidth / sHeight;
                             if (srcRatio > targetRatio) {
@@ -553,10 +541,7 @@
                             }
                         }
                         ctx.drawImage(photo, sx, sy, sWidth, sHeight, px, py, pw, ph);
-                        // --- END: AI Face Crop Logic ---
-
                     } else {
-                        // Draw white placeholder if photo failed
                         ctx.fillStyle = "white";
                         ctx.fillRect(px, py, pw, ph);
                     }
