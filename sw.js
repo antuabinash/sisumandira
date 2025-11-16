@@ -1,6 +1,7 @@
-// UPDATE: v23-network-ai
+// UPDATE: v24-url-fix
 // This version fixes the "0 KV" bug by ALWAYS fetching AI files from the network.
-const CACHE_NAME = 'student-data-cache-v23-network-ai';
+// It also has the correct cache name.
+const CACHE_NAME = 'student-data-cache-v24-url-fix';
 
 // These are the "critical" files needed to start the app.
 const urlsToCache = [
@@ -92,7 +93,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            // Delete old caches (e.g., v22, v21, etc.)
+            // Delete old caches (e.g., v23, v22, etc.)
             return caches.delete(cacheName);
           }
         })
