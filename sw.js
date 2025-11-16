@@ -1,6 +1,7 @@
-// UPDATE: v21 - Robust "lazy load" cache
-// This version installs fast and caches heavy AI files on demand
-const CACHE_NAME = 'student-data-cache-v21-robust-load';
+// UPDATE: v22-listener-fix
+// Decouples AI loading to fix status listeners.
+// Caches essential files on install, lazy-loads heavy AI files on fetch.
+const CACHE_NAME = 'student-data-cache-v22-listener-fix';
 
 // These are the "critical" files needed to start the app.
 // Heavy files (AI models) are left out and will be cached on-the-fly.
@@ -85,7 +86,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            // Delete old caches (e.g., v20, v19, etc.)
+            // Delete old caches (e.g., v21, v20, etc.)
             return caches.delete(cacheName);
           }
         })
