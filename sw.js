@@ -1,6 +1,9 @@
-// UPDATE: Cache version bumped to force refresh of admin.html
-const CACHE_NAME = 'student-data-cache-v20-smart-load';
+// UPDATE: v21 - Robust "lazy load" cache
+// This version installs fast and caches heavy AI files on demand
+const CACHE_NAME = 'student-data-cache-v21-robust-load';
 
+// These are the "critical" files needed to start the app.
+// Heavy files (AI models) are left out and will be cached on-the-fly.
 const urlsToCache = [
   './',
   'index.html',
@@ -20,30 +23,27 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',
 
-  // MediaPipe AI libraries
-  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js',
-  'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
+  // MediaPipe AI libraries (Core JS only, models will be cached on demand)
+  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js'
 ];
 
-// Install the service worker and cache files
+// Install the service worker and cache critical files
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        // Note: addAll() is atomic. If one file fails, the whole cache fails.
-        // It's better for critical app files.
         return cache.addAll(urlsToCache);
       })
   );
 });
 
-// Serve cached files when offline
+// Serve cached files when offline, and cache new requests on-the-fly
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Cache hit
+        // Cache hit - return response
         if (response) {
           return response;
         }
@@ -62,8 +62,8 @@ self.addEventListener('fetch', event => {
 
                 caches.open(CACHE_NAME)
                     .then((cache) => {
-                        // We can cache other WASM/model files as they are requested
-                        // This is good for non-critical assets
+                        // This is where we "lazy load" the AI models.
+                        // When admin.html asks for them, we fetch and store them.
                         if (event.request.method === 'GET') {
                             cache.put(event.request, responseToCache);
                         }
@@ -85,7 +85,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            // Delete old caches (e.g., v19, v18, etc.)
+            // Delete old caches (e.g., v20, v19, etc.)
             return caches.delete(cacheName);
           }
         })
