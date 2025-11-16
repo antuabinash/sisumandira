@@ -12,9 +12,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
     
-    <!-- NEW: Cropper.js Library -->
+    <!-- Cropper.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    
+    <!-- NEW: MediaPipe AI Face Detector -->
+    <!-- This loads the full AI vision library -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"></script>
     
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
@@ -41,7 +45,7 @@
         #downloadZipBtn { background: #ffc107; color: #333; }
         .delete-btn, .crop-btn { padding: 5px 8px; font-size: 12px; width: auto; margin-right: 5px; }
         .delete-btn { background-color: #dc3545; color: white; }
-        .crop-btn { background-color: #17a2b8; color: white; } /* NEW Crop Button Style */
+        .crop-btn { background-color: #17a2b8; color: white; } 
         
         #generatorStatus { font-style: italic; color: #555; }
         .generator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -55,7 +59,7 @@
         #confirmYesBtn { background-color: #dc3545; color: white; }
         #confirmNoBtn { background-color: #6c757d; color: white; }
 
-        /* NEW: Cropper Modal Styles */
+        /* Cropper Modal Styles */
         #cropModal .modal-content { max-width: 90vw; }
         #cropImageContainer { width: 100%; max-height: 70vh; }
         #cropImageContainer img { max-width: 100%; }
@@ -79,7 +83,7 @@
             </div>
             <button id="generateBtn" disabled>Generate & Download ID Cards</button>
         </div>
-        <p id="generatorStatus">Please upload a template and font file to begin.</p>
+        <p id="generatorStatus">Please upload template, font, and wait for AI model to load...</p>
     </div>
 
     <div class="card">
@@ -114,7 +118,6 @@
 
     <canvas id="cardCanvas" style="display: none;"></canvas>
 
-    <!-- Confirmation Modal HTML -->
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <p id="confirmText">Are you sure?</p>
@@ -125,7 +128,6 @@
         </div>
     </div>
     
-    <!-- NEW: Cropper Modal HTML -->
     <div id="cropModal" class="modal">
         <div class="modal-content">
             <h3>Crop Photo</h3>
@@ -140,7 +142,13 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // This MUST be a module script to use MediaPipe
+        
+        // Import AI classes
+        const { FaceDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js");
+        let faceDetector;
+
         let allStudents = [];
         const tableBody = document.querySelector('#studentTable tbody');
         const schoolFilter = document.getElementById('schoolFilter');
@@ -150,7 +158,6 @@
         const confirmNoBtn = document.getElementById('confirmNoBtn');
         const confirmText = document.getElementById('confirmText');
         
-        // NEW: Cropper Modal Elements
         const cropModal = document.getElementById('cropModal');
         const cropImage = document.getElementById('cropImage');
         const saveCropBtn = document.getElementById('saveCropBtn');
@@ -188,8 +195,37 @@
             
             loadData(db);
             document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
-        } catch (e) { alert("Firebase Error: " + e.message); }
+            
+            // NEW: Initialize the AI Face Detector
+            initializeFaceDetector();
 
+        } catch (e) { alert("Firebase Error: " + e.message); }
+        
+        // --- NEW: AI Face Detector Setup ---
+        async function initializeFaceDetector() {
+            generatorStatus.textContent = "Loading AI Face Model (this may take a moment)...";
+            try {
+                const filesetResolver = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                );
+                faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+                        delegate: "GPU" // Use GPU on PC
+                    },
+                    minDetectionConfidence: 0.5,
+                    runningMode: "IMAGE"
+                });
+                generatorStatus.textContent = "AI Model Loaded. Please upload template and font.";
+                checkAssetsReady();
+            } catch (e) {
+                console.error("Failed to load AI Model:", e);
+                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fail.";
+                // We can still enable it, it will just use the fallback crop
+                checkAssetsReady(); 
+            }
+        }
+        
         function toOdia(text) {
             if (!text) return "";
             return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
@@ -236,7 +272,7 @@
                     <td>${s.phone || '-'}</td>
                     <td>${s.schoolName}</td>
                     <td>
-                        <button class="crop-btn" data-id="${s.id}">Crop</button>
+                        <button class="crop-btn" data-id="${s.id}">Manual Crop</button>
                         <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
                     </td>
                 </tr>`;
@@ -258,7 +294,6 @@
                 confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
                 confirmModal.style.display = 'flex';
             }
-            // NEW: Crop Button Click
             if (e.target.classList.contains('crop-btn')) {
                 idToCrop = e.target.dataset.id;
                 const student = allStudents.find(s => s.id.toString() === idToCrop);
@@ -294,205 +329,67 @@
                 }).catch(console.error);
         }
         
-        // --- NEW: Cropper.js Functions ---
+        // --- Manual Cropper.js Functions ---
         
         function openCropper(base64Image) {
-            if (cropper) {
-                cropper.destroy();
-            }
+            if (cropper) cropper.destroy();
             cropImage.src = base64Image;
             cropModal.style.display = 'flex';
-            
-            cropper = new Cropper(cropImage, {
-                aspectRatio: 187 / 225, // ID card ratio
-                viewMode: 1,
-                dragMode: 'move',
-                autoCropArea: 0.8,
-                movable: true,
-                zoomable: true,
-                rotatable: false,
-                scalable: false,
-            });
+            cropper = new Cropper(cropImage, { aspectRatio: 187 / 225, viewMode: 1, dragMode: 'move', autoCropArea: 0.8, movable: true, zoomable: true, rotatable: false, scalable: false });
         }
-        
-        cancelCropBtn.addEventListener('click', () => {
-            cropModal.style.display = 'none';
-            if (cropper) {
-                cropper.destroy();
-                cropper = null;
-            }
-            idToCrop = null;
-        });
-
+        cancelCropBtn.addEventListener('click', () => { cropModal.style.display = 'none'; if (cropper) cropper.destroy(); cropper = null; idToCrop = null; });
         saveCropBtn.addEventListener('click', () => {
             if (!cropper || !idToCrop) return;
-            
-            saveCropBtn.disabled = true;
-            saveCropBtn.textContent = "Saving...";
-
-            // Get the cropped canvas, draw it to 187x225, and get new Base64
-            const croppedCanvas = cropper.getCroppedCanvas({
-                width: 187,
-                height: 225,
-                imageSmoothingEnabled: true,
-                imageSmoothingQuality: 'high',
-            });
-            
-            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); // 90% quality
-
-            // Update Firebase
-            db.collection("students").doc(idToCrop).update({
-                photoBase64: newBase64
-            })
+            saveCropBtn.disabled = true; saveCropBtn.textContent = "Saving...";
+            const croppedCanvas = cropper.getCroppedCanvas({ width: 187, height: 225, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); 
+            db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 })
             .then(() => {
-                // Update local data
                 const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student) {
-                    student.photoBase64 = newBase64;
-                }
-                // Update table thumbnail
+                if (student) student.photoBase64 = newBase64;
                 const tableImg = document.getElementById(`img-${idToCrop}`);
-                if (tableImg) {
-                    tableImg.src = newBase64;
-                }
-                
-                saveCropBtn.disabled = false;
-                saveCropBtn.textContent = "Save Crop";
-                cancelCropBtn.click(); // Close modal
+                if (tableImg) tableImg.src = newBase64;
+                saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop";
+                cancelCropBtn.click();
             })
-            .catch((err) => {
-                alert("Error saving crop: " + err.message);
-                saveCropBtn.disabled = false;
-                saveCropBtn.textContent = "Save Crop";
-            });
-        });
-
-        // --- Raw ZIP Download Logic ---
-        document.getElementById('downloadZipBtn').addEventListener('click', async () => {
-            if(allStudents.length === 0) return alert("No data");
-            const btn = document.getElementById('downloadZipBtn');
-            btn.disabled = true; btn.textContent = "Generating Zip...";
-            
-            const val = schoolFilter.value;
-            const dataToExport = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
-            
-            try {
-                const zip = new JSZip();
-                dataToExport.forEach(s => {
-                    if(s.photoBase64) {
-                        zip.file(s.newPhotoName, s.photoBase64.split(',')[1], {base64: true});
-                    }
-                });
-                
-                const excelData = dataToExport.map(s => {
-                    let d = s.dob; try { const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}`; } catch(e){}
-                    return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: 'E:\\photo\\'+s.newPhotoName };
-                });
-                const ws = XLSX.utils.json_to_sheet(excelData, { header: ['name','class','dob','bloodGroup','rollno','phone','photo'] });
-                const wb = XLSX.utils.book_new(); 
-                let sheetName = (val === 'all' ? 'All_Schools' : val).replace(/[\\/?*\[\]:]/g, "").substring(0, 31);
-                XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                const excelBlob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                zip.file('student_data.xlsx', excelBlob);
-
-                const zipBlob = await zip.generateAsync({ type: 'blob' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(zipBlob);
-                link.download = `${sheetName}_Backup.zip`;
-                link.click();
-            } catch(e) {
-                console.error(e);
-                alert("Error creating zip: " + e.message);
-            } finally {
-                btn.disabled = false; btn.textContent = "Download Raw Backup (ZIP)";
-            }
-        });
-
-
-        // --- ID Card Generator Logic ---
-
-        function checkAssetsReady() {
-            if (templateImage && odiaFont) {
-                generateBtn.disabled = false;
-                generatorStatus.textContent = "Assets loaded. Ready to generate cards.";
-            }
-        }
-
-        templateInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                templateImage = new Image();
-                templateImage.src = URL.createObjectURL(file);
-                templateImage.onload = () => {
-                    cardCanvas.width = templateImage.width;
-                    cardCanvas.height = templateImage.height;
-                    generatorStatus.textContent = "Template loaded. Waiting for font...";
-                    checkAssetsReady();
-                };
-            }
-        });
-
-        fontInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                try {
-                    const fontData = await file.arrayBuffer();
-                    odiaFont = new FontFace('OdiaFont', fontData);
-                    document.fonts.add(odiaFont);
-                    await odiaFont.load();
-                    generatorStatus.textContent = "Font loaded. Waiting for template...";
-                    checkAssetsReady();
-                } catch (err) {
-                    console.error("Font load error:", err);
-                    generatorStatus.textContent = "Error loading font file.";
-                }
-            }
-        });
-
-        generateBtn.addEventListener('click', async () => {
-            if (!templateImage || !odiaFont) {
-                alert("Please upload both template and font files.");
-                return;
-            }
-
-            generatorStatus.textContent = "Starting generation... (This may take a while)";
-            generateBtn.disabled = true;
-
-            const val = schoolFilter.value;
-            const dataToGenerate = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
-            const zip = new JSZip();
-            let count = 0;
-
-            for (const student of dataToGenerate) {
-                try {
-                    const cardBlob = await generateCard(student);
-                    const filename = `${student.name.replace(/ /g, '_')}_${student.roll}.png`;
-                    zip.file(filename, cardBlob);
-                    count++;
-                    generatorStatus.textContent = `Generated card ${count} of ${dataToGenerate.length}...`;
-                } catch (err) {
-                    console.error(`Failed to generate card for ${student.name}:`, err);
-                }
-            }
-
-            generatorStatus.textContent = `Zipping ${count} cards...`;
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-            const link = document.createElement('a');
-            const schoolName = (val === 'all' ? 'All_Schools' : val);
-            link.href = URL.createObjectURL(zipBlob);
-            link.download = `ID_Cards_${schoolName}.zip`;
-            link.click();
-
-G-PXVV87C78S"
+            .catch((err) => { alert("Error saving crop: "T"G-PXVV87C78S"
             };
             firebase.initializeApp(firebaseConfig);
             db = firebase.firestore(); 
             
             loadData(db);
             document.getElementById('refreshBtn').addEventListener('click', () => loadData(db));
-        } catch (e) { alert("Firebase Error: " + e.message); }
+            
+            // NEW: Initialize the AI Face Detector
+            initializeFaceDetector();
 
+        } catch (e) { alert("Firebase Error: " + e.message); }
+        
+        // --- NEW: AI Face Detector Setup ---
+        async function initializeFaceDetector() {
+            generatorStatus.textContent = "Loading AI Face Model (this may take a moment)...";
+            try {
+                const filesetResolver = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                );
+                faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+                        delegate: "GPU" // Use GPU on PC
+                    },
+                    minDetectionConfidence: 0.5,
+                    runningMode: "IMAGE"
+                });
+                generatorStatus.textContent = "AI Model Loaded. Please upload template and font.";
+                checkAssetsReady();
+            } catch (e) {
+                console.error("Failed to load AI Model:", e);
+                generatorStatus.textContent = "Error: Could not load AI Face Model. Cropping will fail.";
+                // We can still enable it, it will just use the fallback crop
+                checkAssetsReady(); 
+            }
+        }
+        
         function toOdia(text) {
             if (!text) return "";
             return text.toString().replace(/\d/g, digit => odiaDigits[digit]);
@@ -539,7 +436,7 @@ G-PXVV87C78S"
                     <td>${s.phone || '-'}</td>
                     <td>${s.schoolName}</td>
                     <td>
-                        <button class="crop-btn" data-id="${s.id}">Crop</button>
+                        <button class="crop-btn" data-id="${s.id}">Manual Crop</button>
                         <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">Delete</button>
                     </td>
                 </tr>`;
@@ -561,7 +458,6 @@ G-PXVV87C78S"
                 confirmText.textContent = `Are you sure you want to permanently delete ${name}? This cannot be undone.`;
                 confirmModal.style.display = 'flex';
             }
-            // NEW: Crop Button Click
             if (e.target.classList.contains('crop-btn')) {
                 idToCrop = e.target.dataset.id;
                 const student = allStudents.find(s => s.id.toString() === idToCrop);
@@ -597,77 +493,30 @@ G-PXVV87C78S"
                 }).catch(console.error);
         }
         
-        // --- NEW: Cropper.js Functions ---
+        // --- Manual Cropper.js Functions ---
         
         function openCropper(base64Image) {
-            if (cropper) {
-                cropper.destroy();
-            }
+            if (cropper) cropper.destroy();
             cropImage.src = base64Image;
             cropModal.style.display = 'flex';
-            
-            cropper = new Cropper(cropImage, {
-                aspectRatio: 187 / 225, // ID card ratio
-                viewMode: 1,
-                dragMode: 'move',
-                autoCropArea: 0.8,
-                movable: true,
-                zoomable: true,
-                rotatable: false,
-                scalable: false,
-            });
+            cropper = new Cropper(cropImage, { aspectRatio: 187 / 225, viewMode: 1, dragMode: 'move', autoCropArea: 0.8, movable: true, zoomable: true, rotatable: false, scalable: false });
         }
-        
-        cancelCropBtn.addEventListener('click', () => {
-            cropModal.style.display = 'none';
-            if (cropper) {
-                cropper.destroy();
-                cropper = null;
-            }
-            idToCrop = null;
-        });
-
+        cancelCropBtn.addEventListener('click', () => { cropModal.style.display = 'none'; if (cropper) cropper.destroy(); cropper = null; idToCrop = null; });
         saveCropBtn.addEventListener('click', () => {
             if (!cropper || !idToCrop) return;
-            
-            saveCropBtn.disabled = true;
-            saveCropBtn.textContent = "Saving...";
-
-            // Get the cropped canvas, draw it to 187x225, and get new Base64
-            const croppedCanvas = cropper.getCroppedCanvas({
-                width: 187,
-                height: 225,
-                imageSmoothingEnabled: true,
-                imageSmoothingQuality: 'high',
-            });
-            
-            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); // 90% quality
-
-            // Update Firebase
-            db.collection("students").doc(idToCrop).update({
-                photoBase64: newBase64
-            })
+            saveCropBtn.disabled = true; saveCropBtn.textContent = "Saving...";
+            const croppedCanvas = cropper.getCroppedCanvas({ width: 187, height: 225, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+            const newBase64 = croppedCanvas.toDataURL('image/jpeg', 0.9); 
+            db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 })
             .then(() => {
-                // Update local data
                 const student = allStudents.find(s => s.id.toString() === idToCrop);
-                if (student) {
-                    student.photoBase64 = newBase64;
-                }
-                // Update table thumbnail
+                if (student) student.photoBase64 = newBase64;
                 const tableImg = document.getElementById(`img-${idToCrop}`);
-                if (tableImg) {
-                    tableImg.src = newBase64;
-                }
-                
-                saveCropBtn.disabled = false;
-                saveCropBtn.textContent = "Save Crop";
-                cancelCropBtn.click(); // Close modal
+                if (tableImg) tableImg.src = newBase64;
+                saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop";
+                cancelCropBtn.click();
             })
-            .catch((err) => {
-                alert("Error saving crop: " + err.message);
-                saveCropBtn.disabled = false;
-                saveCropBtn.textContent = "Save Crop";
-            });
+            .catch((err) => { alert("Error saving crop: " + err.message); saveCropBtn.disabled = false; saveCropBtn.textContent = "Save Crop"; });
         });
 
         // --- Raw ZIP Download Logic ---
@@ -715,9 +564,12 @@ G-PXVV87C78S"
         // --- ID Card Generator Logic ---
 
         function checkAssetsReady() {
-            if (templateImage && odiaFont) {
+            // MODIFIED: Check for AI model
+            if (templateImage && odiaFont && faceDetector) {
                 generateBtn.disabled = false;
-                generatorStatus.textContent = "Assets loaded. Ready to generate cards.";
+                generatorStatus.textContent = "Assets & AI Model loaded. Ready to generate cards.";
+            } else if (!faceDetector) {
+                generatorStatus.textContent = "AI Model is still loading..."
             }
         }
 
@@ -729,7 +581,7 @@ G-PXVV87C78S"
                 templateImage.onload = () => {
                     cardCanvas.width = templateImage.width;
                     cardCanvas.height = templateImage.height;
-                    generatorStatus.textContent = "Template loaded. Waiting for font...";
+                    generatorStatus.textContent = "Template loaded. Waiting for font & AI...";
                     checkAssetsReady();
                 };
             }
@@ -743,7 +595,7 @@ G-PXVV87C78S"
                     odiaFont = new FontFace('OdiaFont', fontData);
                     document.fonts.add(odiaFont);
                     await odiaFont.load();
-                    generatorStatus.textContent = "Font loaded. Waiting for template...";
+                    generatorStatus.textContent = "Font loaded. Waiting for template & AI...";
                     checkAssetsReady();
                 } catch (err) {
                     console.error("Font load error:", err);
@@ -753,10 +605,8 @@ G-PXVV87C78S"
         });
 
         generateBtn.addEventListener('click', async () => {
-            if (!templateImage || !odiaFont) {
-                alert("Please upload both template and font files.");
-                return;
-            }
+            if (!templateImage || !odiaFont) { alert("Please upload both template and font files."); return; }
+            if (!faceDetector) { alert("AI Face Detector is not ready. Please wait."); return; }
 
             generatorStatus.textContent = "Starting generation... (This may take a while)";
             generateBtn.disabled = true;
@@ -768,7 +618,8 @@ G-PXVV87C78S"
 
             for (const student of dataToGenerate) {
                 try {
-                    const cardBlob = await generateCard(student);
+                    // This now runs the AI crop
+                    const cardBlob = await generateCard(student); 
                     const filename = `${student.name.replace(/ /g, '_')}_${student.roll}.png`;
                     zip.file(filename, cardBlob);
                     count++;
@@ -791,6 +642,7 @@ G-PXVV87C78S"
             generateBtn.disabled = false;
         });
 
+        // --- MODIFIED: generateCard function with AI CROP ---
         function generateCard(student) {
             return new Promise(async (resolve, reject) => {
                 try {
@@ -811,32 +663,53 @@ G-PXVV87C78S"
 
                     // 3. Draw Photo
                     const px=222, py=250, pw=187, ph=225, border=3;
-                    
-                    // First, draw the black border
                     ctx.fillStyle = "black";
                     ctx.fillRect(px - border, py - border, pw + (border*2), ph + (border*2));
 
+                    let sx=0, sy=0, sWidth=photo.width, sHeight=photo.height;
+
                     if (photoLoaded) {
-                        // --- NEW: Smart "Center Crop" Logic ---
-                        // **NOTE:** This crops the *already cropped* image. 
-                        // If you use the manual cropper, this will have no effect.
-                        // If you don't use the manual cropper, this will center crop.
-                        const sWidth = photo.width;
-                        const sHeight = photo.height;
-                        const targetRatio = pw / ph; 
-                        const srcRatio = sWidth / sHeight;
-
-                        let sx = 0, sy = 0, new_sWidth = sWidth, new_sHeight = sHeight;
-
-                        if (srcRatio > targetRatio) {
-                            new_sWidth = sHeight * targetRatio;
-                            sx = (sWidth - new_sWidth) / 2;
-                        } else {
-                            new_sHeight = sWidth / targetRatio;
-                            sy = (sHeight - new_sHeight) / 2;
-                        }
+                        // --- NEW: AI Face Crop Logic ---
+                        const detections = faceDetector.detect(photo);
                         
-                        ctx.drawImage(photo, sx, sy, new_sWidth, new_sHeight, px, py, pw, ph);
+                        if (detections.detections.length > 0) {
+                            // AI FOUND A FACE
+                            const bbox = detections.detections[0].boundingBox;
+                            const img_w = photo.width, img_h = photo.height;
+                            
+                            let x1 = bbox.originX, y1 = bbox.originY;
+                            let x2 = bbox.originX + bbox.width, y2 = bbox.originY + bbox.height;
+                            
+                            // Replicate Python expand_bbox logic
+                            const bw = x2 - x1, bh = y2 - y1;
+                            const add_w = parseInt(bw * 0.6); // expand_x=0.6
+                            const add_h = parseInt(bh * 1.4); // expand_y=1.4
+
+                            const new_x1 = Math.max(0, x1 - add_w / 2);
+                            const new_y1 = Math.max(0, y1 - add_h / 2); // 'center' anchor
+                            const new_x2 = Math.min(img_w, x2 + add_w / 2);
+                            const new_y2 = Math.min(img_h, y2 + add_h / 2);
+
+                            sx = new_x1;
+                            sy = new_y1;
+                            sWidth = new_x2 - new_x1;
+                            sHeight = new_y2 - new_y1;
+                            
+                        } else {
+                            // NO FACE FOUND: Use Center Crop Fallback
+                            const targetRatio = pw / ph;
+                            const srcRatio = sWidth / sHeight;
+                            if (srcRatio > targetRatio) {
+                                sWidth = sHeight * targetRatio;
+                                sx = (photo.width - sWidth) / 2;
+                            } else {
+                                sHeight = sWidth / targetRatio;
+                                sy = (photo.height - sHeight) / 2;
+                            }
+                        }
+                        ctx.drawImage(photo, sx, sy, sWidth, sHeight, px, py, pw, ph);
+                        // --- END: AI Face Crop Logic ---
+
                     } else {
                         // Draw white placeholder if photo failed
                         ctx.fillStyle = "white";
