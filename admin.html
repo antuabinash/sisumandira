@@ -704,7 +704,7 @@
                 try {
                     const [year, month, day] = (student.dob||'').split('-');
                     if (year && month && day) formattedDob = `${day}/${month}/${year}`;
-                } catch(e) {}
+                } catch(e) { /* fallback */ }
 
                 ctx.fillText(student.name || "", 227, 505 + 38);
                 ctx.fillText(student.class || "", 227, 575 + 38);
