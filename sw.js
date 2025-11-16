@@ -1,5 +1,5 @@
-// UPDATE: Cache version bumped to force refresh
-const CACHE_NAME = 'student-data-cache-v19-decouple-fix';
+// UPDATE: Cache version bumped to force refresh of admin.html
+const CACHE_NAME = 'student-data-cache-v20-smart-load';
 
 const urlsToCache = [
   './',
@@ -31,6 +31,8 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
+        // Note: addAll() is atomic. If one file fails, the whole cache fails.
+        // It's better for critical app files.
         return cache.addAll(urlsToCache);
       })
   );
@@ -50,15 +52,18 @@ self.addEventListener('fetch', event => {
         return fetch(event.request).then(
             (response) => {
                 // Check if we got a valid response
+                // Don't cache chrome extensions or invalid responses
                 if(!response || response.status !== 200 || event.request.url.startsWith('chrome-extension')) {
                     return response;
                 }
 
+                // Clone the response because it's a stream and can only be consumed once
                 var responseToCache = response.clone();
 
                 caches.open(CACHE_NAME)
                     .then((cache) => {
                         // We can cache other WASM/model files as they are requested
+                        // This is good for non-critical assets
                         if (event.request.method === 'GET') {
                             cache.put(event.request, responseToCache);
                         }
@@ -80,6 +85,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            // Delete old caches (e.g., v19, v18, etc.)
             return caches.delete(cacheName);
           }
         })
