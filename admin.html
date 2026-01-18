@@ -1,273 +1,341 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Panel - ID Cards (Portrait CR80)</title>
+  <title>Admin Panel - ID Cards Pro</title>
 
-  <!-- XLSX & JSZip -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-  <!-- jsPDF UMD -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-  <!-- Firebase (Firestore compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
-    .card { max-width:1100px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
-    h1{ color:#0b53a0; margin:0 0 12px 0; }
-    .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-    select,input[type=file],button { padding:10px; border-radius:6px; border:1px solid #ccc; font-size:15px; }
-    button{ background:#28a745;color:#fff;border:none;cursor:pointer; }
-    button:disabled{ background:#999; cursor:not-allowed; }
-    #downloadZipBtn{ background:#ffc107;color:#222; }
-    table{ width:100%; border-collapse:collapse; margin-top:10px; }
-    th,td{ padding:10px; border:1px solid #e6eef6; vertical-align:middle; text-align:left; }
-    th{ background:#0b69d1; color:#fff; }
-    img.thumb{ width:54px; height:54px; object-fit:cover; border-radius:6px; cursor:pointer; }
-    .modal{ display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; z-index:2000}
-    .modal-content{ background:#fff; padding:18px; border-radius:8px; width:90%; max-width:600px; }
-    .modal-buttons{ display:flex; gap:10px; margin-top:12px; }
-    .generator-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
-    @media(max-width:720px){ .generator-grid{ grid-template-columns:1fr } table{ font-size:13px } }
+    body { font-family: system-ui, -apple-system, sans-serif; padding:20px; background:#f4f7f6; color:#222; }
+    .container { max-width:1200px; margin:0 auto; }
+    h1 { color:#0b53a0; margin-bottom: 20px; }
+    
+    .hidden { display: none !important; }
+    .btn { padding:10px 15px; border-radius:6px; border:none; cursor:pointer; font-weight:600; color:white; }
+    .btn-primary { background:#007bff; }
+    .btn-success { background:#28a745; }
+    .btn-danger { background:#dc3545; }
+    .btn-warning { background:#ffc107; color:#222; }
+    .btn-secondary { background:#6c757d; }
+    input, select { padding:10px; border-radius:6px; border:1px solid #ccc; }
+
+    /* Layouts */
+    .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+    .school-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; border: 1px solid #eee; }
+    .school-card:hover { transform: translateY(-3px); border-color: #007bff; }
+    
+    .detail-header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: start; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .hm-sign-img { height: 50px; border: 1px solid #ddd; margin-top: 5px; background: white; padding: 2px; }
+
+    .status-badge { display:inline-block; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; margin-left:5px; }
+    .status-ok { background:#d4edda; color:#155724; }
+    .status-err { background:#f8d7da; color:#721c24; }
+
+    .config-panel { background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90caf9; display: flex; gap: 20px; align-items: center; flex-wrap:wrap; }
+    
+    .table-container { background: white; padding: 15px; border-radius: 12px; overflow-x: auto; }
+    table { width:100%; border-collapse:collapse; font-size: 14px; }
+    th, td { padding:10px; border-bottom:1px solid #eee; text-align:left; vertical-align: middle; }
+    th { background:#f8f9fa; font-weight: 600; }
+    img.thumb { width:35px; height:35px; border-radius:4px; object-fit: cover; border: 1px solid #ddd; }
+
+    .action-bar { margin-top: 20px; padding: 20px; background: white; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
+
+    /* Modals */
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
+    .modal-content { background:white; padding:25px; border-radius:8px; width:90%; max-width:400px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; }
+    .form-group input, .form-group select { width: 100%; box-sizing: border-box; }
+    .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>Admin Panel: Student Data (Portrait ID Cards)</h1>
 
-  <div class="card">
-    <h2 style="margin:0 0 10px 0">ID Card Generator — Portrait CR80</h2>
-    <div class="generator-grid">
-      <div>
-        <label>1. Upload Template (.png)</label><br>
-        <input id="templateInput" type="file" accept="image/png">
-      </div>
-      <div>
-        <label>2. Upload Odia Font (.ttf)</label><br>
-        <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf">
-      </div>
-      <button id="generateBtn" disabled style="grid-column:1 / -1; margin-top:6px;">Generate & Download ID Cards (ZIP)</button>
-    </div>
-    <p id="generatorStatus" style="font-style:italic;color:#555;margin-top:10px">Status: ❌ Template, ❌ Font, ⏳ AI Model...</p>
-  </div>
+<div class="container">
 
-  <div class="card">
-    <h2 style="margin:0 0 10px 0">Student Data</h2>
-    <div class="controls">
-      <select id="schoolFilter"><option value="all">All Schools</option></select>
-      <button id="refreshBtn" style="background:#17a2b8">Refresh Data</button>
-      <button id="downloadZipBtn">Download Raw Backup (ZIP)</button>
-      <button id="deleteAllBtn" style="background:#dc3545;color:#fff">Delete All</button>
-    </div>
-
-    <table id="studentTable" aria-live="polite">
-      <thead>
-        <tr><th>Photo</th><th>Name</th><th>Class</th><th>Roll</th><th>DOB</th><th>Blood</th><th>Phone</th><th>School</th><th>Actions</th></tr>
-      </thead>
-      <tbody><tr><td colspan="9">Loading data...</td></tr></tbody>
-    </table>
-  </div>
-
-  <canvas id="cardCanvas" style="display:none;"></canvas>
-
-  <!-- Confirm modals -->
-  <div id="confirmModal" class="modal"><div class="modal-content">
-    <p id="confirmText">Are you sure?</p>
-    <div class="modal-buttons"><button id="confirmYesBtn" style="background:#dc3545;color:#fff">Yes, delete</button><button id="confirmNoBtn">Cancel</button></div>
-  </div></div>
-
-  <div id="deleteAllModal" class="modal"><div class="modal-content">
-    <p id="deleteAllText">Delete ALL student records?</p>
-    <div class="modal-buttons"><button id="deleteAllYesBtn" style="background:#dc3545;color:#fff">Delete All</button><button id="deleteAllNoBtn">Cancel</button></div>
-  </div></div>
-
-  <div id="editModal" class="modal"><div class="modal-content">
-    <h3>Edit Student</h3>
-    <form id="editForm" onsubmit="return false;">
-      <input id="editId" type="hidden">
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <div style="flex:1"><label>Name</label><input id="editName" type="text" style="width:100%"></div>
-        <div style="flex:1"><label>Class</label><input id="editClass" type="text" style="width:100%"></div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
-        <div style="flex:1"><label>Roll</label><input id="editRoll" type="text" style="width:100%"></div>
-        <div style="flex:1"><label>DOB</label><input id="editDob" type="date" style="width:100%"></div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
-        <div style="flex:1"><label>Phone</label><input id="editPhone" type="text" style="width:100%"></div>
-        <div style="flex:1"><label>Blood Group</label>
-          <select id="editBlood" style="width:100%;padding:8px"><option value="">(Optional)</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+  <div id="dashboardView">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h1>Admin Dashboard</h1>
+        <div>
+            <button class="btn btn-primary" onclick="loadData()">🔄 Refresh Data</button>
+            <button class="btn btn-warning" id="downloadRawBtn">💾 Backup Data</button>
         </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:12px">
-        <button id="saveEditBtn" style="flex:1;background:#28a745;color:#fff">Save</button>
-        <button id="cancelEditBtn" style="flex:1;background:#6c757d;color:#fff">Cancel</button>
-      </div>
-    </form>
-  </div></div>
+    </div>
+    <div id="schoolGrid" class="school-grid"><p>Loading...</p></div>
+  </div>
+
+  <div id="detailView" class="hidden">
+    <button class="btn btn-secondary" onclick="showDashboard()" style="margin-bottom:15px;">← Back</button>
+    
+    <div class="detail-header">
+        <div>
+            <h2 id="viewSchoolName" style="color:#E85C0D; margin:0;">School Name</h2>
+            <div id="viewAddress" style="color:#555; font-size:14px; margin-top:5px;"></div>
+            <div id="viewContact" style="color:#0277bd; font-weight:bold; margin-top:5px;"></div>
+        </div>
+        <div style="text-align:right;">
+            <small>HM Signature:</small><br>
+            <img id="viewHmSign" class="hm-sign-img" src="" alt="No Sign">
+        </div>
+    </div>
+
+    <div class="config-panel">
+        <div>
+            <label style="font-size:12px; font-weight:bold;">Background PNG</label><br>
+            <input id="templateInput" type="file" accept="image/png">
+            <span id="tplStatus" class="status-badge status-err">Missing</span>
+        </div>
+        <div>
+            <label style="font-size:12px; font-weight:bold;">Odia Font (.ttf)</label><br>
+            <input id="fontInput" type="file" accept=".ttf,.otf">
+            <span id="fontStatus" class="status-badge status-err">Missing</span>
+        </div>
+        <div style="flex:1; text-align:right;">
+             <span id="aiStatus" style="font-style:italic;">⏳ AI Loading...</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th style="width:30px;"><input type="checkbox" id="selectAll"></th>
+                    <th>#</th><th>Photo</th><th>Name</th><th>Class</th><th>Roll</th><th>DOB</th><th>Blood</th><th>Mobile</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="action-bar">
+        <span id="selectionCount">0 students selected</span>
+        <button id="generateBtn" class="btn btn-success" disabled>🖨 Generate Automated ID Cards</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="cardCanvas" style="display:none;"></canvas>
+
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>Edit Student</h3>
+        <input type="hidden" id="editId">
+        <div class="form-group"><label>Name</label><input type="text" id="editName"></div>
+        <div style="display:flex; gap:10px;">
+            <div class="form-group"><label>Class</label><input type="text" id="editClass"></div>
+            <div class="form-group"><label>Roll</label><input type="text" id="editRoll"></div>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <div class="form-group"><label>DOB</label><input type="date" id="editDob"></div>
+            <div class="form-group"><label>Blood</label><select id="editBlood"><option value="">-</option><option value="A+">A+</option><option value="B+">B+</option><option value="O+">O+</option><option value="AB+">AB+</option></select></div>
+        </div>
+        <div class="form-group"><label>Mobile</label><input type="text" id="editPhone"></div>
+        <div class="modal-btns">
+            <button class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+            <button class="btn btn-primary" id="saveEditBtn">Save</button>
+        </div>
+    </div>
+</div>
 
 <script>
-/* ---------- Portrait CR80 sizes & layout ---------- */
-/* Card dimensions: CR80 standard 85.6mm x 54mm. For portrait, width = 54mm, height = 85.6mm */
+/* ---------- CONFIG ---------- */
 const DPI = 300;
-const CARD_MM_W = 54.0;      // portrait width in mm
-const CARD_MM_H = 85.6;      // portrait height in mm
-const CARD_W = Math.round((CARD_MM_W / 25.4) * DPI); // pixels
-const CARD_H = Math.round((CARD_MM_H / 25.4) * DPI);
-
-// A4 landscape at 300 DPI (3508×2480)
+const CARD_W = 638;  // 54mm @ 300dpi
+const CARD_H = 1012; // 85.6mm @ 300dpi
 const A4_W = 3508, A4_H = 2480;
-const GRID_COLS = 5, GRID_ROWS = 2; // 5 across, 2 down => 10 per page
 
-/* ---------- Helpers ---------- */
+/* ---------- HELPERS ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
 function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (''+str).replace(/\d/g,d=>window.odiaDigits[d]||d); }
 function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
 
-/* ---------- DOM ---------- */
-const tableBody = document.querySelector('#studentTable tbody');
-const schoolFilter = document.getElementById('schoolFilter');
-const refreshBtn = document.getElementById('refreshBtn');
-const downloadZipBtn = document.getElementById('downloadZipBtn');
-const deleteAllBtn = document.getElementById('deleteAllBtn');
-const generateBtn = document.getElementById('generateBtn');
-const templateInput = document.getElementById('templateInput');
-const fontInput = document.getElementById('fontInput');
-const generatorStatus = document.getElementById('generatorStatus');
-
-const confirmModal = document.getElementById('confirmModal');
-const confirmText = document.getElementById('confirmText');
-const confirmYesBtn = document.getElementById('confirmYesBtn');
-const confirmNoBtn = document.getElementById('confirmNoBtn');
-
-const deleteAllModal = document.getElementById('deleteAllModal');
-const deleteAllText = document.getElementById('deleteAllText');
-const deleteAllYesBtn = document.getElementById('deleteAllYesBtn');
-const deleteAllNoBtn = document.getElementById('deleteAllNoBtn');
-
-const editModal = document.getElementById('editModal');
-const editId = document.getElementById('editId');
-const editName = document.getElementById('editName');
-const editClass = document.getElementById('editClass');
-const editRoll = document.getElementById('editRoll');
-const editDob = document.getElementById('editDob');
-const editPhone = document.getElementById('editPhone');
-const editBlood = document.getElementById('editBlood');
-const saveEditBtn = document.getElementById('saveEditBtn');
-const cancelEditBtn = document.getElementById('cancelEditBtn');
-
-const cardCanvas = document.getElementById('cardCanvas');
-const ctx = cardCanvas.getContext('2d');
-
-/* ---------- State ---------- */
+/* ---------- STATE ---------- */
 let db = null;
 let allStudents = [];
-let idToDelete = null;
-let deleteFilter = null;
-window.assets = { template:null, templateWidth:0, templateHeight:0, font:null, aiModel:'pending' };
+let schoolsMap = {};
+let currentSchoolStudents = [];
+window.assets = { template: null, font: null, aiModel: 'pending' };
 
-/* ---------- Firebase init ---------- */
+/* ---------- AUTO-LOAD ASSETS ---------- */
+async function loadAutoAssets() {
+    try {
+        const resp = await fetch('OdiaFont.ttf');
+        if(resp.ok) {
+            const buf = await resp.arrayBuffer();
+            const font = new FontFace('OdiaFont', buf);
+            await font.load(); document.fonts.add(font);
+            window.assets.font = true;
+            document.getElementById('fontStatus').className = 'status-badge status-ok';
+            document.getElementById('fontStatus').textContent = 'Auto-Loaded';
+        }
+    } catch(e) { console.log('Font load failed'); }
+
+    try {
+        const resp = await fetch('background.png');
+        if(resp.ok) {
+            const blob = await resp.blob();
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+            img.onload = () => {
+                window.assets.template = img;
+                document.getElementById('tplStatus').className = 'status-badge status-ok';
+                document.getElementById('tplStatus').textContent = 'Auto-Loaded';
+                updateSelection();
+            }
+        }
+    } catch(e) { console.log('BG load failed'); }
+    updateSelection();
+}
+
+/* ---------- FIREBASE INIT ---------- */
 try{
   const firebaseConfig = {
-    apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
-    authDomain: "idcard-60586.firebaseapp.com",
-    projectId: "idcard-60586",
-    storageBucket: "idcard-60586.firebasestorage.app",
-    messagingSenderId: "331979663377",
-    appId: "1:331979663377:web:026e537a7fcaca813129b0",
-    measurementId: "G-PXVV87C78S"
+      apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+      authDomain: "idcard-60586.firebaseapp.com",
+      projectId: "idcard-60586",
+      storageBucket: "idcard-60586.firebasestorage.app",
+      messagingSenderId: "331979663377",
+      appId: "1:331979663377:web:026e537a7fcaca813129b0",
+      measurementId: "G-PXVV87C78S"
   };
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
-  window.db = db;
   loadData();
-} catch(e){ console.error('Firebase init failed', e); alert('Firebase init failed: '+(e.message||e)); }
+  loadAutoAssets();
+} catch(e){ console.error(e); alert('Firebase error: '+e.message); }
 
-/* ---------- Load & render ---------- */
+/* ---------- DATA LOGIC ---------- */
 function loadData(){
-  tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
-  if(!db) return;
-  db.collection('students').get().then(qs=>{
-    allStudents = []; const schools = new Set();
-    qs.forEach(doc=>{ const d=doc.data(); allStudents.push(d); if(d.schoolName) schools.add(d.schoolName); });
-    allStudents.sort((a,b)=> (b.submittedAt?.toMillis()||0) - (a.submittedAt?.toMillis()||0));
-    window.allStudents = allStudents;
-    populateSchoolFilter(schools);
-    renderTable(allStudents);
-    updateDeleteButton();
-  }).catch(err=>{ console.error(err); tableBody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message||err)}</td></tr>`; updateDeleteButton(); });
-}
-function populateSchoolFilter(set){ schoolFilter.innerHTML = '<option value="all">All Schools</option>'; Array.from(set).forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; schoolFilter.appendChild(o); }); }
-function renderTable(data){
-  tableBody.innerHTML = '';
-  if(!data||data.length===0){ tableBody.innerHTML = '<tr><td colspan="9">No data found.</td></tr>'; return; }
-  data.forEach(s=>{
-    const tr=document.createElement('tr'); const photoSrc = s.photoBase64 || 'https://placehold.co/64?text=No+Photo';
-    tr.innerHTML = `<td><img class="thumb" src="${photoSrc}" onclick="window.open('${photoSrc}')"></td>
-      <td>${escapeHtml(s.name||'')}</td><td>${escapeHtml(s.class||'')}</td><td>${escapeHtml(s.roll||'')}</td><td>${escapeHtml(s.dob||'')}</td>
-      <td>${escapeHtml(s.bloodGroup||'-')}</td><td>${escapeHtml(s.phone||'-')}</td><td>${escapeHtml(s.schoolName||'')}</td>
-      <td><button class="edit-btn" data-id="${s.id}">Edit</button> <button class="delete-btn" data-id="${s.id}" data-name="${escapeHtml(s.name||'this student')}">Delete</button></td>`;
-    tableBody.appendChild(tr);
-  });
-}
-
-/* ---------- Table actions ---------- */
-tableBody.addEventListener('click', e=>{
-  if(e.target.classList.contains('delete-btn')){
-    idToDelete = e.target.dataset.id; const nm = e.target.dataset.name || 'this student';
-    confirmText.textContent = `Are you sure you want to permanently delete ${nm}? This cannot be undone.`;
-    confirmModal.style.display = 'flex';
-  } else if(e.target.classList.contains('edit-btn')){
-    openEditModal(e.target.dataset.id);
-  }
-});
-confirmNoBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; idToDelete=null; });
-confirmYesBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; if(idToDelete) deleteStudent(idToDelete); idToDelete=null; });
-
-function deleteStudent(id){
-  if(!db) return;
-  db.collection('students').doc(id.toString()).delete().then(()=>{ allStudents = allStudents.filter(s=>s.id.toString()!==id.toString()); renderTable(schoolFilter.value==='all'?allStudents:allStudents.filter(s=>s.schoolName===schoolFilter.value)); updateDeleteButton(); }).catch(err=>{ console.error(err); alert('Delete failed: '+(err.message||err)); });
+    const grid = document.getElementById('schoolGrid');
+    grid.innerHTML = '<p>Loading data...</p>';
+    db.collection('students').get().then(qs => {
+        allStudents = []; schoolsMap = {};
+        qs.forEach(doc => {
+            const d = doc.data();
+            allStudents.push(d);
+            if(d.schoolName){
+                if(!schoolsMap[d.schoolName]) {
+                    schoolsMap[d.schoolName] = {
+                        name: d.schoolName, count: 0,
+                        block: d.block || '', district: d.district || '',
+                        pin: d.pin || '', phone: d.hmPhone || d.mobile || '',
+                        signature: d.hmSignature || ''
+                    };
+                }
+                schoolsMap[d.schoolName].count++;
+                const sm = schoolsMap[d.schoolName];
+                if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
+                if(!sm.block && d.block) sm.block = d.block;
+            }
+        });
+        renderDashboard();
+    });
 }
 
-/* ---------- Delete All ---------- */
-deleteAllBtn.addEventListener('click', ()=>{ const val=schoolFilter.value; deleteFilter = (val==='all')?null:val; deleteAllText.textContent = deleteFilter ? `Delete ALL records for "${deleteFilter}"?` : 'Delete ALL student records?'; deleteAllModal.style.display='flex'; });
-deleteAllNoBtn.addEventListener('click', ()=>{ deleteAllModal.style.display='none'; deleteFilter=null; });
-deleteAllYesBtn.addEventListener('click', async ()=>{ deleteAllModal.style.display='none'; if(!confirm('This will permanently delete the selected records. Proceed?')) return; try{ await deleteAllStudents(deleteFilter); alert('Delete completed'); loadData(); }catch(err){ console.error(err); alert('Delete failed: '+(err.message||err)) } finally { deleteFilter=null; } });
-
-async function deleteAllStudents(filterSchool){
-  if(!db) throw new Error('Firestore not initialized');
-  let query = db.collection('students'); if(filterSchool) query = query.where('schoolName','==',filterSchool);
-  const snap = await query.get(); if(snap.empty) return;
-  const docs = snap.docs; const chunkSize = 400;
-  for(let i=0;i<docs.length;i+=chunkSize){ const batch = db.batch(); docs.slice(i,i+chunkSize).forEach(d=>batch.delete(d.ref)); await batch.commit(); }
+function renderDashboard(){
+    const grid = document.getElementById('schoolGrid');
+    grid.innerHTML = '';
+    const names = Object.keys(schoolsMap).sort();
+    if(names.length === 0){ grid.innerHTML = '<p>No schools found.</p>'; return; }
+    names.forEach(name => {
+        const s = schoolsMap[name];
+        const div = document.createElement('div');
+        div.className = 'school-card';
+        div.onclick = () => openSchoolDetail(name);
+        div.innerHTML = `<h3>${escapeHtml(s.name)}</h3><div class="school-meta">📍 ${escapeHtml(s.district)}</div><div class="school-meta">👥 ${s.count} Students</div>`;
+        grid.appendChild(div);
+    });
 }
 
-/* ---------- Edit modal ---------- */
-function openEditModal(id){ const st = allStudents.find(s=>s.id.toString()===id.toString()); if(!st) return alert('Student not found'); editId.value=st.id; editName.value=st.name||''; editClass.value=st.class||''; editRoll.value=st.roll||''; editDob.value=st.dob||''; editPhone.value=st.phone||''; editBlood.value=st.bloodGroup||''; editModal.style.display='flex'; }
-cancelEditBtn.addEventListener('click', ()=> editModal.style.display='none');
-saveEditBtn.addEventListener('click', async () => {
-  const id = editId.value; if(!id) return alert('Missing id');
-  const updated = { name: editName.value.trim(), class: editClass.value.trim(), roll: editRoll.value.trim(), dob: editDob.value||'', phone: editPhone.value.trim(), bloodGroup: editBlood.value||'' };
-  try { await db.collection('students').doc(id.toString()).update(updated); const idx = allStudents.findIndex(s=>s.id.toString()===id.toString()); if(idx!==-1) allStudents[idx] = { ...allStudents[idx], ...updated }; renderTable(schoolFilter.value==='all'?allStudents:allStudents.filter(s=>s.schoolName===schoolFilter.value)); editModal.style.display='none'; alert('Saved'); } catch(err){ console.error(err); alert('Save failed: '+(err.message||err)); }
-});
+function showDashboard(){
+    document.getElementById('detailView').classList.add('hidden');
+    document.getElementById('dashboardView').classList.remove('hidden');
+}
 
-/* ---------- Filter & refresh ---------- */
-schoolFilter.addEventListener('change', ()=>{ const v=schoolFilter.value; renderTable(v==='all'?allStudents:allStudents.filter(s=>s.schoolName===v)); updateDeleteButton(); });
-refreshBtn.addEventListener('click', loadData);
+function openSchoolDetail(name){
+    const s = schoolsMap[name];
+    currentSchoolStudents = allStudents.filter(x => x.schoolName === name);
+    document.getElementById('viewSchoolName').textContent = s.name;
+    document.getElementById('viewAddress').textContent = `${s.block}, ${s.district} - ${s.pin}`;
+    document.getElementById('viewContact').textContent = `📞 ${s.phone}`;
+    const sign = document.getElementById('viewHmSign');
+    if(s.signature) { sign.src = s.signature; sign.style.display='block'; } 
+    else { sign.style.display='none'; }
+    
+    renderTable();
+    document.getElementById('dashboardView').classList.add('hidden');
+    document.getElementById('detailView').classList.remove('hidden');
+    updateSelection();
+}
 
-/* ---------- Template & Font handling ---------- */
-templateInput.addEventListener('change', e=>{ const f = e.target.files[0]; if(!f) return; window.assets.template = new Image(); window.assets.template.src = URL.createObjectURL(f); window.assets.template.onload = ()=>{ window.assets.templateWidth = window.assets.template.width; window.assets.templateHeight = window.assets.template.height; updateStatus(); }; });
-fontInput.addEventListener('change', async e=>{ const f = e.target.files[0]; if(!f) return; try{ const buf = await f.arrayBuffer(); window.assets.font = new FontFace('OdiaFont', buf); document.fonts.add(window.assets.font); await window.assets.font.load(); updateStatus(); } catch(err){ console.error('font load err', err); generatorStatus.textContent='Error loading font'; } });
+function renderTable(){
+    const tbody = document.querySelector('#studentTable tbody');
+    tbody.innerHTML = '';
+    document.getElementById('selectAll').checked = false;
+    currentSchoolStudents.forEach((s, i) => {
+        const tr = document.createElement('tr');
+        // Using quotes for ID to ensure string type
+        tr.innerHTML = `<td><input type="checkbox" class="sel" value="${s.id}"></td><td>${i+1}</td>
+        <td><img class="thumb" src="${s.photoBase64 || ''}"></td>
+        <td>${s.name}</td><td>${s.class}</td><td>${s.roll}</td><td>${s.dob}</td><td>${s.bloodGroup||''}</td><td>${s.mobile||''}</td>
+        <td><button class="btn btn-primary" onclick="openEditModal('${s.id}')">✎</button> <button class="btn btn-danger" onclick="del('${s.id}')">🗑</button></td>`;
+        tbody.appendChild(tr);
+    });
+    document.querySelectorAll('.sel').forEach(c => c.onchange = updateSelection);
+}
 
-/* ---------- Status UI ---------- */
-function updateStatus(){ const t = window.assets.template ? '✅ Template' : '❌ Template'; const fo = window.assets.font ? '✅ Font' : '❌ Font'; let ai='⏳ AI Model...'; if(window.assets.aiModel==='loaded') ai='✅ AI Model'; if(window.assets.aiModel==='failed') ai='⚠️ AI (Fallback)'; generatorStatus.textContent = `Status: ${t}, ${fo}, ${ai}`; generateBtn.disabled = !(window.assets.template && window.assets.font && (window.assets.aiModel==='loaded' || window.assets.aiModel==='failed')); }
-setInterval(updateStatus, 800);
+document.getElementById('selectAll').onchange = e => {
+    document.querySelectorAll('.sel').forEach(c => c.checked = e.target.checked);
+    updateSelection();
+};
 
-/* ---------- Mediapipe face detector loader (robust) ---------- */
+function updateSelection(){
+    const n = document.querySelectorAll('.sel:checked').length;
+    document.getElementById('selectionCount').textContent = `${n} selected`;
+    const btn = document.getElementById('generateBtn');
+    
+    // Check asset requirements
+    if(n > 0 && window.assets.font && window.assets.template) {
+        btn.disabled = false;
+        btn.innerHTML = `🖨 Generate <b>${n}</b> Cards`;
+    } else {
+        btn.disabled = true;
+        if(!window.assets.template) btn.textContent = "Background Missing";
+        else if(!window.assets.font) btn.textContent = "Font Missing";
+        else btn.textContent = "Select Students";
+    }
+}
+
+/* ---------- MANUAL UPLOAD ---------- */
+document.getElementById('fontInput').onchange = async e => {
+    const f = e.target.files[0]; if(!f) return;
+    const buf = await f.arrayBuffer();
+    const font = new FontFace('OdiaFont', buf);
+    await font.load(); document.fonts.add(font);
+    window.assets.font = true;
+    document.getElementById('fontStatus').className = 'status-badge status-ok';
+    document.getElementById('fontStatus').textContent = 'Manual Load';
+    updateSelection();
+};
+document.getElementById('templateInput').onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    const img = new Image(); img.src = URL.createObjectURL(f);
+    img.onload = () => {
+        window.assets.template = img;
+        document.getElementById('tplStatus').className = 'status-badge status-ok';
+        document.getElementById('tplStatus').textContent = 'Manual Load';
+        updateSelection();
+    }
+};
+
+/* ---------- ROBUST AI LOADER (Mediapipe) ---------- */
 let FaceDetector = null, FilesetResolver = null, faceDetector = null;
 async function importVision(url){ try{ return await import(url); }catch(e){ console.warn('vision import fail', url, e); throw e; } }
 async function loadVisionBundle(){
@@ -279,260 +347,229 @@ async function loadVisionBundle(){
   throw new Error('vision bundle failed');
 }
 async function initializeFaceDetector(){
-  window.assets.aiModel = 'pending'; updateStatus();
+  window.assets.aiModel = 'pending'; updateSelection();
   try{
-    const mod = await loadVisionBundle(); if(!mod || !mod.FaceDetector || !mod.FilesetResolver) throw new Error('missing exports');
+    const mod = await loadVisionBundle(); 
+    if(!mod || !mod.FaceDetector || !mod.FilesetResolver) throw new Error('missing exports');
     FaceDetector = mod.FaceDetector; FilesetResolver = mod.FilesetResolver;
     const wasmCandidates = ["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm","https://unpkg.com/@mediapipe/tasks-vision@0.10.14/wasm"];
     let fileset = null;
-    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); console.log('fileset from',w); break; }catch(e){ console.warn('fileset fail', w, e); } }
+    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); break; }catch(e){ } }
     if(!fileset) throw new Error('FilesetResolver failed');
     faceDetector = await FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5, runningMode:"IMAGE" });
-    window.assets.aiModel = 'loaded'; updateStatus(); console.log('AI model loaded');
-  }catch(err){ console.warn('face detector init failed', err); window.assets.aiModel = 'failed'; updateStatus(); }
+    window.assets.aiModel = 'loaded'; document.getElementById('aiStatus').textContent = "✅ AI Ready";
+  }catch(err){ 
+    console.warn('face detector init failed', err); 
+    window.assets.aiModel = 'failed'; 
+    document.getElementById('aiStatus').textContent = "⚠️ AI Failed (Simple Crop)";
+  }
+  updateSelection();
 }
 initializeFaceDetector();
 
-/* ---------- jsPDF helper ---------- */
-let jsPDFWrapper = null;
-async function ensureJsPDF(){ if(jsPDFWrapper) return jsPDFWrapper; if(window.jspdf && window.jspdf.jsPDF){ jsPDFWrapper = window.jspdf; return jsPDFWrapper; } try{ const mod = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); jsPDFWrapper = mod; return jsPDFWrapper; } catch(err){ console.error('jspdf load fail', err); throw err; } }
+/* ---------- DRAWING ENGINE ---------- */
+const canvas = document.getElementById('cardCanvas');
+const ctx = canvas.getContext('2d');
 
-/* ---------- Create single card image (CARD_W x CARD_H portrait) ---------- */
-async function generateCardImage(student){
-  cardCanvas.width = CARD_W; cardCanvas.height = CARD_H;
-  ctx.clearRect(0,0,CARD_W,CARD_H);
+async function drawCard(s) {
+    canvas.width = CARD_W; canvas.height = CARD_H;
+    ctx.clearRect(0,0,CARD_W,CARD_H);
 
-  // draw template if available scaled to card size
-  if(window.assets.template){
+    // 1. Background
     ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
-  } else { ctx.fillStyle='#fff'; ctx.fillRect(0,0,CARD_W,CARD_H); }
 
-  // photo area: original template coordinates (from earlier working template) assume portrait scaling:
-  // We will compute a photo area by scaling original values proportionally to template width used before:
-  // Use reference original px/py/pw/ph (from previous code) but scale according to template orientation.
-  // For safety we compute using template width in earlier design (ORIG_TPL_W). If not available, fall back to simple top-center placement.
+    // 2. School Name & Address (Top Centered)
+    ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; 
+    ctx.font = 'bold 45px OdiaFont';
+    ctx.fillText(s.schoolName, (CARD_W/2) + 60, 75); 
+    const sm = schoolsMap[s.schoolName];
+    ctx.font = '30px OdiaFont';
+    ctx.fillText(`${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`, (CARD_W/2) + 60, 125);
 
-  const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
-  const tplW = window.assets.templateWidth || CARD_W;
-  const scale = CARD_W / tplW;
-  const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
-  const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
-  const border = Math.max(2, Math.round(3 * scale));
+    // 3. Photo & Box (Standard Coordinates)
+    const tplW = window.assets.template.width || CARD_W;
+    const scale = CARD_W / tplW;
+    const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
+    const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
+    const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
+    const border = Math.max(2, Math.round(3 * scale));
 
-  // black frame behind photo
-  ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
+    ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
-  // load student photo
-  const photo = new Image(); let photoLoaded = false;
-  if(student.photoBase64){
-    photo.src = student.photoBase64;
-    await new Promise((res,rej)=>{ photo.onload = ()=>{ photoLoaded=true; res(); }; photo.onerror = rej; });
-  }
-
-  let sx=0, sy=0, sW = photo.width || 1, sH = photo.height || 1;
-  if(photoLoaded && faceDetector && window.assets.aiModel === 'loaded'){
-    try{
-      const det = faceDetector.detect(photo);
-      if(det && det.detections && det.detections.length>0){
-        const bbox = det.detections[0].boundingBox;
-        const img_w = photo.width, img_h = photo.height;
-        let x1=bbox.originX, y1=bbox.originY, x2=bbox.originX + bbox.width, y2=bbox.originY + bbox.height;
-        const bw = x2-x1, bh = y2-y1;
-        const add_w = parseInt(bw * 0.6), add_h = parseInt(bh * 1.4);
-        const new_x1 = Math.max(0, x1 - add_w/2), new_y1 = Math.max(0, y1 - add_h/2);
-        const new_x2 = Math.min(img_w, x2 + add_w/2), new_y2 = Math.min(img_h, y2 + add_h/2);
-        sx = new_x1; sy = new_y1; sW = new_x2 - new_x1; sH = new_y2 - new_y1;
-      } else {
-        const targetRatio = pw / ph; const srcRatio = sW / sH;
-        if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
-      }
-    }catch(e){
-      console.warn('per-image face detect failed', e);
-      const targetRatio = pw / ph; const srcRatio = sW / sH;
-      if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
-    }
-  } else if(photoLoaded){
-    const targetRatio = pw / ph; const srcRatio = sW / sH;
-    if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
-  }
-
-  if(photoLoaded){ ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph); }
-  else { ctx.fillStyle = '#fff'; ctx.fillRect(px, py, pw, ph); }
-
-  // draw texts (scaled)
-  ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#000';
-  const baseFont = 38; ctx.font = `${Math.max(12, Math.round(baseFont * scale))}px OdiaFont, sans-serif`;
-  const textX = Math.round(227 * scale);
-  // format DOB
-  let dobFormatted = student.dob || '';
-  try{ const [y,m,d] = (student.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-  ctx.fillText(student.name || '', textX, Math.round((505 + 38) * scale));
-  ctx.fillText(student.class || '', textX, Math.round((575 + 38) * scale));
-  ctx.fillText(toOdiaDigits(dobFormatted), textX, Math.round((647 + 38) * scale));
-  ctx.fillText(toOdiaDigits(student.roll || ''), textX, Math.round((718 + 38) * scale));
-  ctx.fillText(toOdiaDigits(student.phone || ''), textX, Math.round((789 + 38) * scale));
-
-  if(student.bloodGroup){ ctx.fillStyle='#fff'; ctx.font = `${Math.max(10, Math.round(23 * scale))}px OdiaFont, sans-serif`; ctx.fillText(student.bloodGroup, Math.round(480 * scale), Math.round((360 + 23) * scale)); }
-
-  return await new Promise(res => cardCanvas.toBlob(res,'image/png'));
-}
-
-/* ---------- Create A4 pages with portrait cards (5×2) ---------- */
-async function createA4Pages(singleImages){
-  const pages = [];
-  const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
-  const pctx = pageCanvas.getContext('2d');
-
-  const pagePadding = Math.round(A4_W * 0.02);
-  const gutterX = Math.round(A4_W * 0.02);
-  const gutterY = Math.round(A4_H * 0.03);
-
-  const availableW = A4_W - pagePadding*2 - (GRID_COLS-1)*gutterX;
-  const availableH = A4_H - pagePadding*2 - (GRID_ROWS-1)*gutterY;
-  const cellW = Math.floor(availableW / GRID_COLS);
-  const cellH = Math.floor(availableH / GRID_ROWS);
-
-  for(let i=0;i<singleImages.length;i+=GRID_COLS*GRID_ROWS){
-    const chunk = singleImages.slice(i, i + GRID_COLS*GRID_ROWS);
-    pctx.fillStyle = '#fff'; pctx.fillRect(0,0,A4_W,A4_H);
-
-    for(let j=0;j<chunk.length;j++){
-      const img = chunk[j].img;
-      const col = j % GRID_COLS;
-      const row = Math.floor(j / GRID_COLS);
-      const cellX = pagePadding + col*(cellW + gutterX);
-      const cellY = pagePadding + row*(cellH + gutterY);
-
-      const cellInnerPad = Math.round(Math.min(cellW, cellH) * 0.06);
-      const maxW = cellW - cellInnerPad*2;
-      const maxH = cellH - cellInnerPad*2;
-      const ratio = Math.min(maxW / img.width, maxH / img.height);
-      const dw = Math.round(img.width * ratio);
-      const dh = Math.round(img.height * ratio);
-      const dx = cellX + Math.round((cellW - dw)/2);
-      const dy = cellY + Math.round((cellH - dh)/2);
-
-      pctx.drawImage(img, dx, dy, dw, dh);
+    if(s.photoBase64) {
+        const photo = new Image(); photo.src = s.photoBase64;
+        await new Promise(r => photo.onload=r);
+        let sx=0, sy=0, sw=photo.width, sh=photo.height;
+        
+        // --- SMART AI CROP ---
+        if(window.assets.aiModel === 'loaded' && faceDetector) {
+            try {
+                const det = faceDetector.detect(photo);
+                if(det && det.detections && det.detections.length > 0) {
+                    const bbox = det.detections[0].boundingBox;
+                    // Expanded bounding box for ID card (Shoulders+Hair)
+                    const bw = bbox.width; const bh = bbox.height;
+                    const add_w = parseInt(bw * 0.6); 
+                    const add_h = parseInt(bh * 1.4); 
+                    
+                    const new_x1 = Math.max(0, bbox.originX - add_w/2);
+                    const new_y1 = Math.max(0, bbox.originY - add_h/2);
+                    const new_x2 = Math.min(photo.width, bbox.originX + bw + add_w/2);
+                    const new_y2 = Math.min(photo.height, bbox.originY + bh + add_h/2);
+                    
+                    sx = new_x1; sy = new_y1;
+                    sw = new_x2 - new_x1; sh = new_y2 - new_y1;
+                }
+            } catch(e){}
+        }
+        ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
     }
 
-    pages.push(await new Promise(res=> pageCanvas.toBlob(res,'image/png')));
-    pctx.clearRect(0,0,A4_W,A4_H);
-  }
-  return pages;
+    // 4. Student Text
+    ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.font = `${Math.round(38*scale)}px OdiaFont`;
+    const tx = Math.round(227*scale);
+    let dob = s.dob || '';
+    try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
+    
+    ctx.fillText(s.name||'', tx, Math.round((505+38)*scale));
+    ctx.fillText(s.class||'', tx, Math.round((575+38)*scale));
+    ctx.fillText(toOdiaDigits(dob), tx, Math.round((647+38)*scale));
+    ctx.fillText(toOdiaDigits(s.roll), tx, Math.round((718+38)*scale));
+    const phNum = s.mobile || s.phone || '';
+    ctx.fillText(toOdiaDigits(phNum), tx, Math.round((789+38)*scale));
+    
+    if(s.bloodGroup){
+        ctx.fillStyle = 'white'; ctx.font = `${Math.round(23*scale)}px OdiaFont`;
+        ctx.fillText(s.bloodGroup, Math.round(480*scale), Math.round((360+23)*scale));
+    }
+
+    // 5. HM Signature
+    if(sm && sm.signature) {
+        const sign = new Image(); sign.src = sm.signature;
+        await new Promise(r => sign.onload=r);
+        const ratio = Math.min(200/sign.width, 80/sign.height);
+        const sw = sign.width * ratio;
+        const sh = sign.height * ratio;
+        ctx.drawImage(sign, CARD_W - sw - 30, CARD_H - 150, sw, sh);
+    }
+
+    return await new Promise(r => canvas.toBlob(r, 'image/png'));
 }
 
-/* ---------- Create combined PDF: portrait pages (no borders) with tiled watermark ---------- */
-async function createCombinedPdf(singleImages){
-  const mod = await ensureJsPDF(); const jsPDF = mod.jsPDF;
-  const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] }); // portrait page per card
-  let first = true;
-  for(const item of singleImages){
-    // draw watermark tiled on a temp canvas same size as card
-    const tmp = document.createElement('canvas'); tmp.width = CARD_W; tmp.height = CARD_H;
-    const tctx = tmp.getContext('2d');
-
-    // draw card image full-bleed (no border)
-    tctx.drawImage(item.img, 0, 0, CARD_W, CARD_H);
-
-    // tiled watermark
-    const wm = 'AN DIGITAL';
-    tctx.globalAlpha = 0.12; tctx.fillStyle = '#000';
-    const fontSize = Math.round(Math.min(CARD_W, CARD_H) * 0.075);
-    tctx.font = `${fontSize}px sans-serif`; tctx.textAlign='center'; tctx.textBaseline='middle';
-    const spacingX = Math.round(fontSize * 4.0); const spacingY = Math.round(fontSize * 3.0);
-    tctx.save(); tctx.translate(CARD_W/2, CARD_H/2); tctx.rotate(-Math.PI/10);
-    const cols = Math.ceil(CARD_W / spacingX) + 2; const rows = Math.ceil(CARD_H / spacingY) + 2;
-    const startX = - (cols/2) * spacingX; const startY = - (rows/2) * spacingY;
-    for(let r=0;r<rows;r++){ for(let c=0;c<cols;c++){ tctx.fillText(wm, startX + c*spacingX, startY + r*spacingY); } }
-    tctx.restore(); tctx.globalAlpha = 1;
-
-    const dataUrl = tmp.toDataURL('image/jpeg', 0.95);
-    if (!first) pdf.addPage([CARD_W, CARD_H], 'portrait');
-    pdf.addImage(dataUrl, 'JPEG', 0, 0, CARD_W, CARD_H);
-    first = false;
-  }
-  return pdf;
-}
-
-/* ---------- Utility: blob->arrayBuffer ---------- */
-function blobToArrayBuffer(b){ return new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.onerror = rej; fr.readAsArrayBuffer(b); }); }
-
-/* ---------- Main generate & zip ---------- */
-generateBtn.addEventListener('click', async ()=>{
-  if(!window.assets.template || !window.assets.font) return alert('Please upload template and font first.');
-  if(window.assets.aiModel === 'pending') return alert('AI is still initializing. Wait a moment.');
-  generateBtn.disabled = true; generatorStatus.textContent = 'Generating...';
-  try{
-    const val = schoolFilter.value; const dataToGen = (val==='all')? allStudents : allStudents.filter(s=>s.schoolName===val);
-    if(!dataToGen || dataToGen.length===0) return alert('No students to generate.');
+/* ---------- GENERATE HANDLER ---------- */
+document.getElementById('generateBtn').onclick = async () => {
+    const ids = Array.from(document.querySelectorAll('.sel:checked')).map(c => c.value);
+    const targets = currentSchoolStudents.filter(s => ids.includes(s.id.toString()));
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true; btn.textContent = "Processing...";
 
     const zip = new JSZip();
-    const rawFolder = zip.folder('raw_data');
-    const singlesFolder = zip.folder('single_cards');
-    const a4Folder = zip.folder('a4_pages');
+    const folder = zip.folder("PNGs");
+    const { jsPDF } = window.jspdf;
+    
+    const verifyPdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
+    const printPdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
 
-    const singleImages = [];
-    let counter = 0;
-    for(const st of dataToGen){
-      counter++; generatorStatus.textContent = `Generating ${counter} / ${dataToGen.length}...`;
-      if(st.photoBase64){ const fname = (st.newPhotoName || `${(st.name||'photo').replace(/\s+/g,'_')}_${st.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); rawFolder.file(fname, st.photoBase64.split(',')[1], { base64:true }); }
-      const blob = await generateCardImage(st);
-      const filename = `${(st.name||'student').replace(/\s+/g,'_')}_${st.roll||''}.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
-      singlesFolder.file(filename, await blobToArrayBuffer(blob));
-      const img = new Image(); img.src = URL.createObjectURL(blob); await new Promise((r,rej)=>{ img.onload=r; img.onerror=rej; });
-      singleImages.push({ id: st.id, name: filename, blob, img, student: st });
+    const imgs = [];
+
+    for(let i=0; i<targets.length; i++) {
+        btn.textContent = `Drawing ${i+1}/${targets.length}...`;
+        const blob = await drawCard(targets[i]);
+        folder.file(`${targets[i].name}_${targets[i].roll}.png`, blob);
+        
+        const imgUrl = URL.createObjectURL(blob);
+        const imgObj = new Image(); imgObj.src = imgUrl;
+        await new Promise(r => imgObj.onload=r);
+        imgs.push(imgObj);
+
+        if(i>0) printPdf.addPage([CARD_W, CARD_H], 'portrait');
+        printPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
+
+        if(i>0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
+        verifyPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
+        
+        verifyPdf.saveGraphicsState();
+        verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3}));
+        verifyPdf.setTextColor(255, 0, 0); 
+        verifyPdf.setFontSize(30);
+        for(let r=-50; r<CARD_H+50; r+=150) {
+            for(let c=-50; c<CARD_W+50; c+=200) {
+                verifyPdf.text("VERIFICATION ONLY", c, r, {angle:45});
+            }
+        }
+        verifyPdf.restoreGraphicsState();
     }
 
-    generatorStatus.textContent = 'Creating A4 pages (5×2)...';
-    const a4Pages = await createA4Pages(singleImages);
-    for(let i=0;i<a4Pages.length;i++){ a4Folder.file(`a4_landscape_page_${i+1}.png`, await blobToArrayBuffer(a4Pages[i])); }
+    btn.textContent = "Building A4 Sheets...";
+    const pageCvs = document.createElement('canvas'); pageCvs.width=A4_W; pageCvs.height=A4_H;
+    const pctx = pageCvs.getContext('2d');
+    const GAP_X = 40, GAP_Y = 150;
+    const startX = (A4_W - ((5*CARD_W)+(4*GAP_X)))/2;
+    const startY = (A4_H - ((2*CARD_H)+(1*GAP_Y)))/2;
 
-    generatorStatus.textContent = 'Creating combined PDF (watermark tiled)...';
-    const combinedPdf = await createCombinedPdf(singleImages);
-    const pdfBlob = combinedPdf.output('blob');
-    zip.file('combined.pdf', await blobToArrayBuffer(pdfBlob));
+    for(let i=0; i<imgs.length; i+=10) {
+        pctx.fillStyle='#fff'; pctx.fillRect(0,0,A4_W,A4_H);
+        const chunk = imgs.slice(i, i+10);
+        chunk.forEach((img, idx) => {
+            const c = idx % 5; const r = Math.floor(idx/5);
+            const x = startX + c*(CARD_W+GAP_X);
+            const y = startY + r*(CARD_H+GAP_Y);
+            pctx.drawImage(img, x, y);
+            pctx.strokeStyle='#ccc'; pctx.lineWidth=2; pctx.strokeRect(x,y,CARD_W,CARD_H);
+        });
+        const pBlob = await new Promise(r => pageCvs.toBlob(r, 'image/jpeg', 0.9));
+        zip.file(`A4_Print_Sheet_${Math.floor(i/10)+1}.jpg`, pBlob);
+    }
 
-    generatorStatus.textContent = 'Preparing Excel...';
-    const excelData = dataToGen.map(s => {
-      let dobFormatted = s.dob || '';
-      try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-      return { name: s.name||'', class: s.class||'', dob: toOdiaDigits(dobFormatted), bloodGroup: s.bloodGroup||'', rollno: toOdiaDigits(s.roll||''), phone: toOdiaDigits(s.phone||''), photo: (s.newPhotoName||'') };
-    });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','class','dob','bloodGroup','rollno','phone','photo'] });
-    const wb = XLSX.utils.book_new();
-    const sheetName = (val==='all' ? 'All_Schools' : val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Sheet1';
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    zip.file('student_data.xlsx', excelArray);
+    zip.file("Verify_Proof.pdf", verifyPdf.output('arraybuffer'));
+    
+    btn.textContent = "Zipping...";
+    const content = await zip.generateAsync({type:'blob'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(content);
+    a.download = `ID_Cards_${Date.now()}.zip`; a.click();
+    
+    btn.disabled = false; updateSelection();
+};
 
-    generatorStatus.textContent = 'Zipping...';
-    const zipBlob = await zip.generateAsync({ type:'blob' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(zipBlob); a.download = `${sheetName}_Backup.zip`; a.click();
-    generatorStatus.textContent = 'Done — download started';
-  } catch(err){
-    console.error('Generation failed', err); alert('Generation failed: ' + (err.message || err));
-    generatorStatus.textContent = 'Error during generation';
-  } finally { generateBtn.disabled = false; }
-});
+/* ---------- EDIT/DEL ---------- */
+function openEditModal(id){
+    const s = currentSchoolStudents.find(x => x.id == id);
+    if(!s) { console.error('Student not found:', id); return; }
+    
+    document.getElementById('editId').value = s.id;
+    document.getElementById('editName').value = s.name;
+    document.getElementById('editClass').value = s.class;
+    document.getElementById('editRoll').value = s.roll;
+    document.getElementById('editDob').value = s.dob;
+    document.getElementById('editBlood').value = s.bloodGroup;
+    document.getElementById('editPhone').value = s.mobile || s.phone || '';
+    document.getElementById('editModal').style.display = 'flex';
+}
 
-/* ---------- Download raw ZIP (photos+excel) ---------- */
-downloadZipBtn.addEventListener('click', async ()=>{
-  if(!allStudents || allStudents.length===0) return alert('No data');
-  downloadZipBtn.disabled = true; downloadZipBtn.textContent = 'Generating Zip...';
-  try{
-    const val = schoolFilter.value; const dataToExport = (val==='all')? allStudents : allStudents.filter(s=>s.schoolName===val);
-    const zip = new JSZip(); dataToExport.forEach(s=>{ if(s.photoBase64){ const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); zip.file(`raw_data/${fname}`, s.photoBase64.split(',')[1], { base64:true }); }});
-    const excelData = dataToExport.map(s => { let dobFormatted = s.dob || ''; try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){} return { name:s.name||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', rollno:toOdiaDigits(s.roll||''), phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','class','dob','bloodGroup','rollno','phone','photo'] }); const wb = XLSX.utils.book_new(); let sheetName = (val==='all'?'All_Schools':val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31)||'Sheet1'; XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' }); zip.file('student_data.xlsx', excelArray);
-    const blob = await zip.generateAsync({ type:'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${sheetName}_Backup.zip`; a.click();
-  } catch(err){ console.error(err); alert('Error creating zip: ' + (err.message || err)); } finally { downloadZipBtn.disabled=false; downloadZipBtn.textContent='Download Raw Backup (ZIP)'; }
-});
+function del(id){
+    if(!confirm('Delete?')) return;
+    db.collection('students').doc(id.toString()).delete().then(loadData);
+}
 
-/* ---------- Helpers ---------- */
-function updateDeleteButton(){ try{ deleteAllBtn.disabled = !(Array.isArray(window.allStudents) && window.allStudents.length>0); }catch(e){ deleteAllBtn.disabled=true; } }
-updateStatus();
-
+document.getElementById('saveEditBtn').onclick = async () => {
+    const id = document.getElementById('editId').value;
+    const data = {
+        name: document.getElementById('editName').value,
+        class: document.getElementById('editClass').value,
+        roll: document.getElementById('editRoll').value,
+        dob: document.getElementById('editDob').value,
+        bloodGroup: document.getElementById('editBlood').value,
+        mobile: document.getElementById('editPhone').value
+    };
+    try {
+        await db.collection('students').doc(id.toString()).update(data);
+        const s = currentSchoolStudents.find(x => x.id == id);
+        if(s) Object.assign(s, data);
+        document.getElementById('editModal').style.display='none';
+        renderTable();
+    } catch(e) { alert("Error: "+e.message); }
+};
 </script>
 </body>
 </html>
