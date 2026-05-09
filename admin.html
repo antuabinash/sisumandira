@@ -16,8 +16,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
-  <!-- QRCode.js for automated QR Generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Modern QRCode library for automated QR Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
 
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
@@ -186,27 +186,21 @@ function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'
 function getQRCodeCanvas(text) {
     return new Promise((resolve) => {
         if(typeof QRCode === 'undefined') return resolve(null);
-        const div = document.createElement('div');
+        const canvas = document.createElement('canvas');
         
-        // FIX: Convert UTF-8 (Odia) to a byte-string so qrcode.js calculates the correct capacity version
-        let utf8Text = text || ' ';
-        try {
-            utf8Text = unescape(encodeURIComponent(utf8Text));
-        } catch (e) {
-            console.warn('QR Encoding issue:', e);
-        }
-
-        new QRCode(div, { 
-            text: utf8Text, 
-            width: 256, 
-            height: 256, 
-            correctLevel: QRCode.CorrectLevel.L 
+        // Using the modern QRCode library which handles UTF-8 perfectly
+        QRCode.toCanvas(canvas, text || ' ', { 
+            errorCorrectionLevel: 'L',
+            margin: 1,
+            width: 256
+        }, function (error) {
+            if (error) {
+                console.error('QR Generation Error:', error);
+                resolve(null);
+            } else {
+                resolve(canvas);
+            }
         });
-        
-        setTimeout(() => {
-            const canvas = div.querySelector('canvas');
-            resolve(canvas || null);
-        }, 50);
     });
 }
 
