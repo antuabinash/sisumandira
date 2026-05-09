@@ -143,21 +143,23 @@ const GRID_COLS = 5, GRID_ROWS = 2;
 // =========================================================
 const C = {
     // 1. PHOTO BOX (Center Area)
-    photoX: 165,    // Starting X (Left edge of photo box)
-    photoY: 280,    // Starting Y (Top edge of photo box)
-    photoW: 280,    // Width of photo box
-    photoH: 340,    // Height of photo box
+    photoX: 208,    // Starting X (Left edge of photo box)
+    photoY: 347,    // Starting Y (Top edge of photo box)
+    photoW: 218,    // Width of photo box (426 - 208)
+    photoH: 195,    // Height of photo box (542 - 347)
 
     // 2. NAME TEXT (Centered below photo)
     nameY: 675,           // The Y height to print the Name
     nameColor: '#cc0000', // Hex color (e.g. #cc0000 = Dark Red)
     nameFont: 48,         // Font size in pixels
 
-    // 3. DETAILS LIST (Father, Mother, Phone, Address)
-    // Looking at your image, these align left next to the colons ( : )
-    detailStartX: 300,    // The X position where the values start
-    detailStartY: 742,    // Y coordinate of the first line (Father's Name)
-    detailLineGap: 48,    // Vertical spacing between each line
+    // 3. DETAILS LIST (Father, Mother, Phone, DOB, Address)
+    detailX: 321,         // Universal X coordinate for the details text
+    fatherY: 672,
+    motherY: 712,
+    phoneY: 754,
+    dobY: 791,
+    addressY: 832,
     detailColor: '#000000',
     detailFont: 26,
 
@@ -166,7 +168,7 @@ const C = {
     qrY: 740,
     qrSize: 180,
 
-    // 5. EXTRA DATA (Class, Roll, DOB, Blood Group)
+    // 5. EXTRA DATA (Class, Roll, Blood Group)
     // If you want to print them somewhere on the card, set showExtra to true
     showExtra: false,
     extraX: 420,
@@ -505,23 +507,23 @@ async function generateCardImage(student){
   ctx.font = `bold ${Math.round(C.nameFont * scale)}px OdiaFont, sans-serif`;
   ctx.fillText(student.name || '', Math.round(CARD_W / 2), Math.round(C.nameY * scale));
 
-  // 3. Draw Four Details (Father, Mother, Phone, Address)
+  // 3. Draw Details (Father, Mother, Phone, DOB, Address) using explicit coordinates
   ctx.textAlign = 'left';
   ctx.fillStyle = C.detailColor;
   ctx.font = `${Math.round(C.detailFont * scale)}px OdiaFont, sans-serif`;
 
-  const vX = Math.round(C.detailStartX * scale);
-  let currentY = C.detailStartY;
+  const dX = Math.round(C.detailX * scale);
 
-  const printLine = (text) => {
-      ctx.fillText(text, vX, Math.round(currentY * scale));
-      currentY += C.detailLineGap;
-  };
-
-  printLine(student.fatherName || '-');
-  printLine(student.motherName || '-');
-  printLine(toOdiaDigits(student.phone || '-'));
-  printLine(student.address || '-');
+  ctx.fillText(student.fatherName || '-', dX, Math.round(C.fatherY * scale));
+  ctx.fillText(student.motherName || '-', dX, Math.round(C.motherY * scale));
+  ctx.fillText(toOdiaDigits(student.phone || '-'), dX, Math.round(C.phoneY * scale));
+  
+  // Format Date of Birth
+  let dobFormatted = student.dob || '-';
+  try{ const [y,m,d] = dobFormatted.split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
+  ctx.fillText(toOdiaDigits(dobFormatted), dX, Math.round(C.dobY * scale));
+  
+  ctx.fillText(student.address || '-', dX, Math.round(C.addressY * scale));
 
 
   // 4. Generate & Draw QR Code
@@ -539,10 +541,6 @@ async function generateCardImage(student){
       let exY = C.extraY;
       ctx.fillText(`Class: ${student.class || '-'}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
       ctx.fillText(`Roll: ${toOdiaDigits(student.roll || '-')}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
-      
-      let dobFormatted = student.dob || '';
-      try{ const [y,m,d] = dobFormatted.split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-      ctx.fillText(`DOB: ${toOdiaDigits(dobFormatted)}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
       
       if (student.bloodGroup) {
             ctx.fillStyle = '#cc0000';
