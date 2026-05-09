@@ -17,9 +17,9 @@
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; margin:0; padding:20px; background:#f4f7f6; color:#333; }
     h1 { text-align:center; color:#0056b3; }
     .card { max-width:600px; margin:0 auto 20px; padding:20px; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
-    label{display:block;margin-bottom:6px;font-weight:600}
+    label{display:block;margin-bottom:6px;font-weight:600;margin-top:10px;}
     input, select { width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
-    button { width:100%; padding:12px; border:none; border-radius:4px; cursor:pointer; font-size:16px; margin-top:10px; }
+    button { width:100%; padding:12px; border:none; border-radius:4px; cursor:pointer; font-size:16px; margin-top:15px; }
     #openCameraBtn{background:#17a2b8;color:white}
     #addBtn{background:#007bff;color:white}
     #completeBtn{background:#ffc107;color:#333}
@@ -31,7 +31,7 @@
     .sync-status { margin-left:8px; font-size:18px; cursor:pointer; }
     .sync-synced { color:#28a745; cursor:default; }
     .sync-offline { color:#6c757d; }
-    .sync-missing { color:#e67e22; } /* reload icon */
+    .sync-missing { color:#e67e22; }
     .progress-bar { width:100%; height:8px; background:#eee; border-radius:5px; margin-top:8px; display:none; overflow:hidden; }
     .progress-bar-inner { width:0%; height:100%; background:#007bff; border-radius:5px; transition:width .3s ease; }
     #photoPreview { width:100px;height:100px;display:none;margin-top:10px;object-fit:cover;border-radius:4px;border:1px solid #ccc; }
@@ -58,15 +58,22 @@
   <div id="schoolDisplay" class="card" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <div><strong id="schoolNameDisplay"></strong></div>
-      <button id="editSchoolBtn" style="background:#6c757d;color:white;padding:6px 12px">Edit School</button>
+      <button id="editSchoolBtn" style="background:#6c757d;color:white;padding:6px 12px;width:auto;margin:0;">Edit School</button>
     </div>
   </div>
 
   <div id="entryForm" class="card" style="display:none;">
     <h3>Add Students</h3>
+    
     <label>Full Name:</label><input id="name" placeholder="ପୂରା ନାମ" />
-    <label>Class:</label>
-    <select id="class" required>
+    <label>Father's Name:</label><input id="fatherName" placeholder="ପିତାଙ୍କ ନାମ" />
+    <label>Mother's Name:</label><input id="motherName" placeholder="ମାତାଙ୍କ ନାମ" />
+    <label>Address:</label><input id="address" placeholder="ଠିକଣା" />
+    
+    <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+            <label>Class:</label>
+            <select id="class" required>
                 <option value="">ଶ୍ରେଣୀ ବାଛନ୍ତୁ</option>
                 <option value="ଶିଶୁ ବାଟିକା">ଶିଶୁ ବାଟିକା</option>
                 <option value="ପ୍ରଥମ">ପ୍ରଥମ</option>
@@ -80,33 +87,41 @@
                 <option value="ନବମ">ନବମ</option>
                 <option value="ଦଶମ">ଦଶମ</option>
             </select>
-    <label>Roll No:</label><input id="roll" placeholder="ରୋଲ୍ ନମ୍ବର" />
-    <label>Date of Birth:</label><input id="dob" type="date" />
-    <label>Phone No:</label><input id="phone" />
-    <label>Blood Group:</label>
-    <select id="bloodGroup">
-    <option value="">(Optional)</option>
-    <option value="A+">A+</option>
-    <option value="A-">A-</option>
-    <option value="B+">B+</option>
-    <option value="B-">B-</option>
-    <option value="AB+">AB+</option>
-    <option value="AB-">AB-</option>
-    <option value="O+">O+</option>
-    <option value="O-">O-</option>
-</select>
+        </div>
+        <div style="flex:1;">
+            <label>Roll No:</label><input id="roll" placeholder="ରୋଲ୍ ନମ୍ବର" />
+        </div>
+    </div>
 
-    <label>Student Photo:</label>
+    <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+            <label>Date of Birth:</label><input id="dob" type="date" />
+        </div>
+        <div style="flex:1;">
+            <label>Blood Group:</label>
+            <select id="bloodGroup">
+                <option value="">(Optional)</option>
+                <option value="A+">A+</option><option value="A-">A-</option>
+                <option value="B+">B+</option><option value="B-">B-</option>
+                <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                <option value="O+">O+</option><option value="O-">O-</option>
+            </select>
+        </div>
+    </div>
+    
+    <label>Phone No:</label><input id="phone" placeholder="ଦୂରଭାଷ" />
+
+    <label style="margin-top:15px;border-top:1px solid #eee;padding-top:15px;">Student Photo:</label>
     <button id="openCameraBtn">Take a Picture</button>
     <div style="margin-top:8px;">
-      <label style="font-weight:normal">...or Upload from Gallery</label>
+      <label style="font-weight:normal;font-size:14px;">...or Upload from Gallery</label>
       <input id="photo" type="file" accept="image/*" />
       <img id="photoPreview" src="" alt="Preview">
     </div>
 
     <button id="addBtn">Add Student</button>
 
-    <hr style="border:none;border-top:1px solid #eee;margin:18px 0">
+    <hr style="border:none;border-top:1px solid #eee;margin:25px 0 15px">
 
     <h3>Student Preview List</h3>
     <div id="studentList"></div>
@@ -209,10 +224,8 @@
       loadStudentsFromDB();
     }
 
-    // service worker optional
     if ('serviceWorker' in navigator) window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
-    // load from indexedDB
     function loadStudentsFromDB() {
       if (!localDB || !currentSchoolName) return;
       const tx = localDB.transaction(['students'],'readonly');
@@ -221,37 +234,23 @@
       const req = index.getAll(currentSchoolName);
       req.onsuccess = async () => {
         students = req.result || [];
-        // For students that were marked synced=true, check whether they still exist on server:
-        // If server doc missing -> mark missing=true and synced=false (do NOT auto-reupload)
-        // If synced=false (never uploaded) -> auto-upload as before
         await Promise.all(students.map(async (s) => {
           if (s.synced) {
             try {
               const doc = await fbDB.collection('students').doc(s.id.toString()).get();
               if (!doc.exists) {
                 s.synced = false; s.missing = true;
-                // persist change locally
                 const tx2 = localDB.transaction(['students'],'readwrite'); tx2.objectStore('students').put(s);
-              } else {
-                s.missing = false;
-              }
-            } catch(e) {
-              // if firestore unreachable, keep current flags unchanged
-              console.warn('Could not verify server for', s.id, e);
-            }
+              } else { s.missing = false; }
+            } catch(e) { console.warn('Could not verify server for', s.id, e); }
           } else {
-            // not synced: keep for auto-upload (unless s.missing===true which means previously deleted on server)
-            if (!s.missing) {
-              // auto upload new unsynced items
-              uploadStudent(s);
-            }
+            if (!s.missing) uploadStudent(s);
           }
         }));
         renderStudentList();
       };
     }
 
-    // render helpers
     function renderStudentList() {
       studentListDiv.innerHTML = '';
       students.forEach(s => renderStudent(s));
@@ -265,9 +264,7 @@
       div.dataset.studentId = student.id;
       const url = student.photoBase64 || (student.photoFile ? URL.createObjectURL(student.photoFile) : 'https://placehold.co/40x40/eee/aaa?text=...');
 
-      // determine status icon: synced ✅ (not clickable), missing 🔄 (clickable), offline ☁️ (not clickable)
-      let statusIcon = '';
-      let statusClass = '';
+      let statusIcon = '', statusClass = '';
       if (student.missing) { statusIcon = '🔄'; statusClass = 'sync-missing'; } 
       else if (student.synced) { statusIcon = '✅'; statusClass = 'sync-synced'; } 
       else { statusIcon = '☁️'; statusClass = 'sync-offline'; }
@@ -280,22 +277,19 @@
           <div class="progress-bar" id="progress-${student.id}"><div class="progress-bar-inner" id="progress-inner-${student.id}"></div></div>
         </div>
         <span class="sync-status ${statusClass}" id="sync-${student.id}" title="${student.missing ? 'Reload to re-upload to server' : (student.synced ? 'Synced' : 'Not uploaded yet')}">${statusIcon}</span>
-        <button class="deleteBtn" data-id="${student.id}" style="margin-left:10px;background:#dc3545;color:#fff;padding:6px 8px;border-radius:6px">Delete</button>
+        <button class="deleteBtn" data-id="${student.id}" style="margin-left:10px;background:#dc3545;color:#fff;padding:6px 8px;border-radius:6px;border:none;">Delete</button>
       `;
       studentListDiv.appendChild(div);
     }
 
-    // small HTML escape
     function escapeHtml(s) { return (s+'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    // photo preview
     function handlePhotoPreview(fileOrBlob) {
       if (!fileOrBlob) { photoPreview.style.display = 'none'; return; }
       photoPreview.src = URL.createObjectURL(fileOrBlob);
       photoPreview.style.display = 'block';
     }
 
-    // camera logic (improved capture)
     openCameraBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -303,9 +297,7 @@
         cameraVideo.srcObject = cameraStream;
         cameraModal.style.display = 'flex';
         await cameraVideo.play().catch(()=>{});
-      } catch (err) {
-        alert('Error opening camera: ' + (err.message || err));
-      }
+      } catch (err) { alert('Error opening camera: ' + (err.message || err)); }
     });
     closeCameraBtn.addEventListener('click', stopCamera);
     function stopCamera() {
@@ -316,11 +308,8 @@
     captureBtn.addEventListener('click', async () => {
       captureBtn.disabled = true;
       try {
-        // wait briefly for video frame to be ready
         await waitForVideoFrame(cameraVideo, 800);
-
-        const w = cameraVideo.videoWidth || 1280;
-        const h = cameraVideo.videoHeight || Math.round(w * 3/4);
+        const w = cameraVideo.videoWidth || 1280, h = cameraVideo.videoHeight || Math.round(w * 3/4);
         cameraCanvas.width = w; cameraCanvas.height = h;
         const ctx = cameraCanvas.getContext('2d');
         ctx.drawImage(cameraVideo, 0, 0, w, h);
@@ -329,56 +318,44 @@
         capturedPhotoFile = new File([blob], 'cam.jpg', { type:'image/jpeg' });
         handlePhotoPreview(capturedPhotoFile);
         stopCamera();
-      } catch (err) {
-        console.error('Capture error', err);
-        alert('Capture failed: ' + (err.message || err));
-      } finally {
-        captureBtn.disabled = false;
-      }
+      } catch (err) { alert('Capture failed: ' + (err.message || err)); } 
+      finally { captureBtn.disabled = false; }
     });
 
     function waitForVideoFrame(videoEl, maxWaitMs=800) {
       return new Promise((resolve) => {
-        const interval = 50;
-        let waited=0;
+        const interval = 50; let waited=0;
         (function check(){
           if (videoEl.videoWidth && videoEl.videoHeight) return resolve();
-          waited += interval;
-          if (waited >= maxWaitMs) return resolve();
+          waited += interval; if (waited >= maxWaitMs) return resolve();
           setTimeout(check, interval);
         })();
       });
     }
 
-    // compress image to base64 (same as before)
     function compressImage(file) {
       return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
+        const reader = new FileReader(); reader.readAsDataURL(file);
         reader.onload = (ev) => {
-          const img = new Image();
-          img.src = ev.target.result;
+          const img = new Image(); img.src = ev.target.result;
           img.onload = () => {
-            const MAX_WIDTH = 800;
-            const scale = Math.min(1, MAX_WIDTH / img.width);
+            const MAX_WIDTH = 800, scale = Math.min(1, MAX_WIDTH / img.width);
             const canvas = document.createElement('canvas');
-            canvas.width = Math.round(img.width * scale);
-            canvas.height = Math.round(img.height * scale);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             resolve(canvas.toDataURL('image/jpeg', 0.7));
-          };
-          img.onerror = reject;
-        };
-        reader.onerror = reject;
+          }; img.onerror = reject;
+        }; reader.onerror = reject;
       });
     }
 
-    // add student
     document.getElementById('addBtn').addEventListener('click', async () => {
       try {
         if (!currentSchoolName) return alert('School name not set.');
         const name = document.getElementById('name').value.trim();
+        const fatherName = document.getElementById('fatherName').value.trim();
+        const motherName = document.getElementById('motherName').value.trim();
+        const address = document.getElementById('address').value.trim();
         const cls = document.getElementById('class').value.trim();
         const roll = document.getElementById('roll').value.trim();
         const dob = document.getElementById('dob').value;
@@ -394,215 +371,116 @@
         const newPhotoName = `${randomText(10)}.${ext}`;
 
         const student = {
-          id: Date.now(),
-          schoolName: currentSchoolName,
-          name, class: cls, dob, dobOdia: convertToOdiaDate(dob), bloodGroup: blood, roll, phone,
-          photoFile: photo instanceof File ? photo : null,
-          photoBase64: base64Image,
-          newPhotoName,
-          synced: false,
-          missing: false
+          id: Date.now(), schoolName: currentSchoolName,
+          name, fatherName, motherName, address, class: cls, dob, dobOdia: convertToOdiaDate(dob), bloodGroup: blood, roll, phone,
+          photoFile: photo instanceof File ? photo : null, photoBase64: base64Image, newPhotoName, synced: false, missing: false
         };
 
         const tx = localDB.transaction(['students'],'readwrite');
         tx.objectStore('students').add(student).onsuccess = () => {
-          students.push(student);
-          renderStudent(student);
-          // auto upload (only for non-missing)
-          uploadStudent(student);
-          // reset form
-          document.getElementById('name').value=''; document.getElementById('class').value=''; document.getElementById('roll').value=''; document.getElementById('dob').value=''; document.getElementById('phone').value=''; document.getElementById('bloodGroup').value='';
-          photoInput.value=''; capturedPhotoFile=null; photoPreview.style.display='none';
-          renderStudentList();
+          students.push(student); renderStudent(student); uploadStudent(student);
+          // Reset
+          ['name','fatherName','motherName','address','class','roll','dob','phone','bloodGroup'].forEach(id => document.getElementById(id).value='');
+          photoInput.value=''; capturedPhotoFile=null; photoPreview.style.display='none'; renderStudentList();
         };
-      } catch(err){ alert('Add failed: '+(err.message||err)); console.error(err); }
+      } catch(err){ alert('Add failed: '+(err.message||err)); }
     });
 
     function convertToOdiaDate(d) {
-      if (!d) return '';
-      try {
-        const [y,m,day] = d.split('-');
-        return `${Array.from(day).map(x=>odiaDigits[x]||x).join('')} ${odiaMonths[Number(m)-1]||''} ${Array.from(y).map(x=>odiaDigits[x]||x).join('')}`;
-      } catch(e){ return d; }
+      if (!d) return ''; try { const [y,m,day] = d.split('-'); return `${Array.from(day).map(x=>odiaDigits[x]||x).join('')} ${odiaMonths[Number(m)-1]||''} ${Array.from(y).map(x=>odiaDigits[x]||x).join('')}`; } catch(e){ return d; }
     }
     function randomText(l) { let r=''; const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; for(let i=0;i<l;i++) r+=c.charAt(Math.floor(Math.random()*c.length)); return r; }
 
-    // Upload a student to Firestore (used for auto-upload and manual reload)
     async function uploadStudent(student) {
-      if (!fbDB) { console.warn('Firebase not connected'); return; }
-      // if student.missing === true that indicates server doc was intentionally removed -> we DO NOT auto-upload
-      if (student.missing) return;
-
-      // show progress bar
-      const barContainer = document.getElementById(`progress-${student.id}`);
-      const barInner = document.getElementById(`progress-inner-${student.id}`);
+      if (!fbDB) return; if (student.missing) return;
+      const barContainer = document.getElementById(`progress-${student.id}`), barInner = document.getElementById(`progress-inner-${student.id}`);
       if (barContainer) { barContainer.style.display='block'; barInner.style.width='30%'; }
 
       const data = {
-        id: student.id,
-        schoolName: student.schoolName,
-        name: student.name,
-        class: student.class,
-        dob: student.dob,
-        bloodGroup: student.bloodGroup,
-        roll: student.roll,
-        phone: student.phone,
-        newPhotoName: student.newPhotoName,
-        photoBase64: student.photoBase64,
-        submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+        id: student.id, schoolName: student.schoolName, name: student.name,
+        fatherName: student.fatherName || '', motherName: student.motherName || '', address: student.address || '',
+        class: student.class, dob: student.dob, bloodGroup: student.bloodGroup, roll: student.roll, phone: student.phone,
+        newPhotoName: student.newPhotoName, photoBase64: student.photoBase64, submittedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
       try {
         await fbDB.collection('students').doc(student.id.toString()).set(data);
-        // mark synced
         student.synced = true; student.missing = false;
-        // update local DB (remove photoFile to save space)
-        const copy = Object.assign({}, student);
-        delete copy.photoFile;
-        const tx = localDB.transaction(['students'],'readwrite');
-        tx.objectStore('students').put(copy);
+        const copy = Object.assign({}, student); delete copy.photoFile;
+        const tx = localDB.transaction(['students'],'readwrite'); tx.objectStore('students').put(copy);
         if (barInner) { barInner.style.width='100%'; barInner.classList.add('progress-complete'); }
         setTimeout(()=>{ if (barContainer) barContainer.style.display='none'; const icon = document.getElementById(`sync-${student.id}`); if (icon){ icon.textContent='✅'; icon.className='sync-status sync-synced'; } }, 800);
-      } catch(err) {
-        console.error('Upload failed', err);
-        if (barInner) barInner.style.width='0%';
-        alert('Upload failed: ' + (err.message||err));
-      }
+      } catch(err) { if (barInner) barInner.style.width='0%'; alert('Upload failed: ' + (err.message||err)); }
     }
 
-    // Listen for clicks on student list: delete & reload-only
     studentListDiv.addEventListener('click', (e) => {
       const target = e.target;
       if (target.classList.contains('deleteBtn')) {
         const id = Number(target.dataset.id);
-        showConfirm(`Delete local student ${id}? Also deletes from server if uploaded.`, () => {
-          // delete locally and from firestore
+        showConfirm(`Delete local student ${id}? Also deletes from server.`, () => {
           const tx = localDB.transaction(['students'],'readwrite');
-          tx.objectStore('students').delete(id).onsuccess = () => {
-            students = students.filter(s => s.id !== id);
-            renderStudentList();
-            if (fbDB) fbDB.collection('students').doc(id.toString()).delete().catch(()=>{});
-          };
+          tx.objectStore('students').delete(id).onsuccess = () => { students = students.filter(s => s.id !== id); renderStudentList(); if (fbDB) fbDB.collection('students').doc(id.toString()).delete().catch(()=>{}); };
         });
       }
       if (target.classList.contains('sync-status') || target.closest('.sync-status')) {
-        // Click on sync icon (only react if missing)
         const span = target.classList.contains('sync-status') ? target : target.closest('.sync-status');
-        const id = Number(span.id.replace('sync-',''));
-        const student = students.find(s => s.id === id);
+        const id = Number(span.id.replace('sync-','')); const student = students.find(s => s.id === id);
         if (!student) return;
-        if (student.missing) {
-          // user wants to reload/reupload this student
-          showConfirm(`Re-upload this student's data to Firestore?`, async () => {
-            // remove missing flag and upload
-            student.missing = false;
-            await uploadStudent(student);
-            renderStudentList();
-          });
-        } else {
-          // other statuses: do nothing
-        }
+        if (student.missing) { showConfirm(`Re-upload to Firestore?`, async () => { student.missing = false; await uploadStudent(student); renderStudentList(); }); }
       }
     });
 
-    // student delete button listener inside studentListDiv
-    studentListDiv.addEventListener('click', (e) => {
-      // handled above
-    });
-
-    // check server for each locally-known, previously-synced student when app starts / loads DB
-    // This is done inside loadStudentsFromDB() above.
-
-    // helper: show confirm modal
     function showConfirm(text, onYes) {
-      const modal = document.getElementById('confirmModal');
-      document.getElementById('confirmText').textContent = text;
-      modal.style.display = 'flex';
+      const modal = document.getElementById('confirmModal'); document.getElementById('confirmText').textContent = text; modal.style.display = 'flex';
       const yes = document.getElementById('confirmYesBtn'), no = document.getElementById('confirmNoBtn');
-
       function cleanup() { no.removeEventListener('click', onNo); yes.removeEventListener('click', onYesClick); modal.style.display='none'; }
-      function onNo(){ cleanup(); }
-      function onYesClick(){ cleanup(); onYes && onYes(); }
-      no.addEventListener('click', onNo);
-      yes.addEventListener('click', onYesClick);
+      function onNo(){ cleanup(); } function onYesClick(){ cleanup(); onYes && onYes(); }
+      no.addEventListener('click', onNo); yes.addEventListener('click', onYesClick);
     }
 
-    // file upload preview
-    photoInput.addEventListener('change', () => {
-      if (photoInput.files[0]) {
-        capturedPhotoFile = null;
-        handlePhotoPreview(photoInput.files[0]);
-      }
-    });
+    photoInput.addEventListener('change', () => { if (photoInput.files[0]) { capturedPhotoFile = null; handlePhotoPreview(photoInput.files[0]); } });
 
-    // clear all local data
     clearBtn.addEventListener('click', () => {
       showConfirm(`Delete ALL local data for ${currentSchoolName}?`, () => {
-        const tx = localDB.transaction(['students'],'readwrite');
-        const index = tx.objectStore('students').index('schoolName');
-        index.getAll(currentSchoolName).onsuccess = (e) => {
-          e.target.result.forEach(s => localDB.transaction(['students'],'readwrite').objectStore('students').delete(s.id));
-          students = []; renderStudentList();
-        };
+        const tx = localDB.transaction(['students'],'readwrite'); const index = tx.objectStore('students').index('schoolName');
+        index.getAll(currentSchoolName).onsuccess = (e) => { e.target.result.forEach(s => localDB.transaction(['students'],'readwrite').objectStore('students').delete(s.id)); students = []; renderStudentList(); };
       });
     });
 
-    // Download local backup (same as before)
     completeBtn.addEventListener('click', async () => {
       if (!students.length) return;
       completeBtn.disabled = true; completeBtn.textContent = 'Processing...';
-      try {
-        const {zipBlob, zipFileName} = await createZipData();
-        downloadBlob(zipBlob, zipFileName, 'application/zip');
-      } catch(e){ alert('Error: '+(e.message||e)); }
+      try { const {zipBlob, zipFileName} = await createZipData(); downloadBlob(zipBlob, zipFileName, 'application/zip'); } catch(e){ alert('Error: '+(e.message||e)); }
       finally { completeBtn.disabled = false; completeBtn.textContent = 'Download Local Backup (Excel/ZIP)'; }
     });
 
     function createZipData() {
       return new Promise((resolve, reject) => {
-        const tx = localDB.transaction(['students'],'readonly');
-        const store = tx.objectStore('students');
-        const index = store.index('schoolName');
+        const tx = localDB.transaction(['students'],'readonly'); const store = tx.objectStore('students'); const index = store.index('schoolName');
         index.getAll(currentSchoolName).onsuccess = (e) => {
           const dbStudents = e.target.result || [];
           const excelData = dbStudents.map(s => {
             let d = s.dob; try{ const [y,m,dy] = s.dob.split('-'); d = `${dy}/${m}/${y}` } catch(e){}
-            return { name: s.name, class: s.class, dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll, phone: s.phone, photo: s.newPhotoName || '' };
+            return { name: s.name||'', fatherName: s.fatherName||'', motherName: s.motherName||'', address: s.address||'', class: s.class||'', dob: d, bloodGroup: s.bloodGroup||'', rollno: s.roll||'', phone: s.phone||'', photo: s.newPhotoName || '' };
           });
-          const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','class','dob','bloodGroup','rollno','phone','photo'] });
-          const wb = XLSX.utils.book_new();
-          const sheetName = (currentSchoolName || 'Students').replace(/[\\\/\?\*\[\]\:\"]/g,'').substring(0,31);
+          const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] });
+          const wb = XLSX.utils.book_new(); const sheetName = (currentSchoolName || 'Students').replace(/[\\\/\?\*\[\]\:\"]/g,'').substring(0,31);
           XLSX.utils.book_append_sheet(wb, ws, sheetName);
           const excelBlob = new Blob([XLSX.write(wb, { bookType:'xlsx', type:'array' })]);
           const zip = new JSZip(); zip.file('student_data.xlsx', excelBlob);
-
           dbStudents.forEach(s => {
             if (s.photoFile) zip.file(s.newPhotoName, s.photoFile);
             else if (s.photoBase64) {
-              const byteString = atob(s.photoBase64.split(',')[1] || '');
-              const ab = new ArrayBuffer(byteString.length);
-              const ia = new Uint8Array(ab);
-              for (let i=0;i<byteString.length;i++) ia[i] = byteString.charCodeAt(i);
-              zip.file(s.newPhotoName, new Blob([ab], { type:'image/jpeg' }));
+              const byteString = atob(s.photoBase64.split(',')[1] || ''); const ab = new ArrayBuffer(byteString.length); const ia = new Uint8Array(ab);
+              for (let i=0;i<byteString.length;i++) ia[i] = byteString.charCodeAt(i); zip.file(s.newPhotoName, new Blob([ab], { type:'image/jpeg' }));
             }
           });
-
           zip.generateAsync({ type:'blob' }).then(blob => resolve({ zipBlob: blob, zipFileName: `${currentSchoolName}_backup.zip` })).catch(reject);
         };
       });
     }
 
-    function downloadBlob(content, name, type) {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([content], {type}));
-      a.download = name; a.click();
-    }
-
-    // when page loads and db ready, we already call loadStudentsFromDB in indexedDB onsuccess
-    // Note: that function handles auto-upload for unsynced entries but does NOT auto-reupload for those marked .missing
-
+    function downloadBlob(content, name, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], {type})); a.download = name; a.click(); }
   </script>
 </body>
 </html>
-
-
