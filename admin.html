@@ -187,7 +187,22 @@ function getQRCodeCanvas(text) {
     return new Promise((resolve) => {
         if(typeof QRCode === 'undefined') return resolve(null);
         const div = document.createElement('div');
-        new QRCode(div, { text: text || ' ', width: 256, height: 256, correctLevel: QRCode.CorrectLevel.L });
+        
+        // FIX: Convert UTF-8 (Odia) to a byte-string so qrcode.js calculates the correct capacity version
+        let utf8Text = text || ' ';
+        try {
+            utf8Text = unescape(encodeURIComponent(utf8Text));
+        } catch (e) {
+            console.warn('QR Encoding issue:', e);
+        }
+
+        new QRCode(div, { 
+            text: utf8Text, 
+            width: 256, 
+            height: 256, 
+            correctLevel: QRCode.CorrectLevel.L 
+        });
+        
         setTimeout(() => {
             const canvas = div.querySelector('canvas');
             resolve(canvas || null);
