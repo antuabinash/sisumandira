@@ -285,7 +285,11 @@ function renderTable(data){
       <td>${escapeHtml(s.roll||'')}</td>
       <td>${escapeHtml(s.phone||'-')}</td>
       <td>${escapeHtml(s.schoolName||'')}</td>
-      <td><button class="edit-btn" data-id="${s.id}">Edit</button> <button class="delete-btn" data-id="${s.id}" data-name="${escapeHtml(s.name||'this student')}">Delete</button></td>`;
+      <td>
+        <button class="generate-btn" data-id="${s.id}" style="background:#007bff; color:#fff; padding:6px; font-size:12px; margin-right:4px;" title="Generate Single Card">Card</button>
+        <button class="edit-btn" data-id="${s.id}" style="padding:6px; font-size:12px; margin-right:4px;">Edit</button> 
+        <button class="delete-btn" data-id="${s.id}" data-name="${escapeHtml(s.name||'this student')}" style="background:#dc3545; color:#fff; padding:6px; font-size:12px; border:none;">Delete</button>
+      </td>`;
     tableBody.appendChild(tr);
   });
 }
@@ -298,8 +302,40 @@ tableBody.addEventListener('click', e=>{
     confirmModal.style.display = 'flex';
   } else if(e.target.classList.contains('edit-btn')){
     openEditModal(e.target.dataset.id);
+  } else if(e.target.classList.contains('generate-btn')){
+    generateSingleCard(e.target);
   }
 });
+
+async function generateSingleCard(btn) {
+  if(!window.assets.template || !window.assets.font) return alert('Please upload template and font first.');
+  if(window.assets.aiModel === 'pending') return alert('AI is still initializing. Wait a moment.');
+  
+  const id = btn.dataset.id;
+  const student = allStudents.find(s => s.id.toString() === id.toString());
+  if(!student) return alert('Student not found');
+  
+  const origText = btn.textContent;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  
+  try {
+    const blob = await generateCardImage(student);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); 
+    a.href = url;
+    a.download = `${(student.name||'student').replace(/\s+/g,'_')}_${student.roll||''}_Card.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch(err) {
+    console.error(err); 
+    alert('Generation failed: ' + (err.message || err));
+  } finally {
+    btn.textContent = origText; 
+    btn.disabled = false;
+  }
+}
+
 confirmNoBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; idToDelete=null; });
 confirmYesBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; if(idToDelete) deleteStudent(idToDelete); idToDelete=null; });
 
