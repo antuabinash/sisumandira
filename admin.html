@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Panel - ID Cards (Portrait CR80)</title>
+  <title>Admin Panel - ID Cards Generator</title>
 
   <!-- XLSX & JSZip -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -16,6 +16,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
+  <!-- QRCode.js for automated QR Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
     .card { max-width:1100px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
@@ -25,7 +28,8 @@
     button{ background:#28a745;color:#fff;border:none;cursor:pointer; }
     button:disabled{ background:#999; cursor:not-allowed; }
     #downloadZipBtn{ background:#ffc107;color:#222; }
-    table{ width:100%; border-collapse:collapse; margin-top:10px; }
+    .table-container { overflow-x: auto; }
+    table{ width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; min-width:800px; }
     th,td{ padding:10px; border:1px solid #e6eef6; vertical-align:middle; text-align:left; }
     th{ background:#0b69d1; color:#fff; }
     img.thumb{ width:54px; height:54px; object-fit:cover; border-radius:6px; cursor:pointer; }
@@ -37,14 +41,14 @@
   </style>
 </head>
 <body>
-  <h1>Admin Panel: Student Data (Portrait ID Cards)</h1>
+  <h1>Admin Panel: Student Data & ID Generator</h1>
 
   <div class="card">
-    <h2 style="margin:0 0 10px 0">ID Card Generator — Portrait CR80</h2>
+    <h2 style="margin:0 0 10px 0">ID Card Generator — Saraswati Vidya Mandir Layout</h2>
     <div class="generator-grid">
       <div>
-        <label>1. Upload Template (.png)</label><br>
-        <input id="templateInput" type="file" accept="image/png">
+        <label>1. Upload Template (.png / .jpg)</label><br>
+        <input id="templateInput" type="file" accept="image/png, image/jpeg">
       </div>
       <div>
         <label>2. Upload Odia Font (.ttf)</label><br>
@@ -64,12 +68,14 @@
       <button id="deleteAllBtn" style="background:#dc3545;color:#fff">Delete All</button>
     </div>
 
-    <table id="studentTable" aria-live="polite">
-      <thead>
-        <tr><th>Photo</th><th>Name</th><th>Class</th><th>Roll</th><th>DOB</th><th>Blood</th><th>Phone</th><th>School</th><th>Actions</th></tr>
-      </thead>
-      <tbody><tr><td colspan="9">Loading data...</td></tr></tbody>
-    </table>
+    <div class="table-container">
+        <table id="studentTable" aria-live="polite">
+          <thead>
+            <tr><th>Photo</th><th>Name</th><th>Father's Name</th><th>Mother's Name</th><th>Class</th><th>Roll</th><th>Phone</th><th>School</th><th>Actions</th></tr>
+          </thead>
+          <tbody><tr><td colspan="9">Loading data...</td></tr></tbody>
+        </table>
+    </div>
   </div>
 
   <canvas id="cardCanvas" style="display:none;"></canvas>
@@ -94,6 +100,13 @@
         <div style="flex:1"><label>Class</label><input id="editClass" type="text" style="width:100%"></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <div style="flex:1"><label>Father's Name</label><input id="editFatherName" type="text" style="width:100%"></div>
+        <div style="flex:1"><label>Mother's Name</label><input id="editMotherName" type="text" style="width:100%"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <div style="flex:1"><label>Address</label><input id="editAddress" type="text" style="width:100%"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
         <div style="flex:1"><label>Roll</label><input id="editRoll" type="text" style="width:100%"></div>
         <div style="flex:1"><label>DOB</label><input id="editDob" type="date" style="width:100%"></div>
       </div>
@@ -112,21 +125,75 @@
 
 <script>
 /* ---------- Portrait CR80 sizes & layout ---------- */
-/* Card dimensions: CR80 standard 85.6mm x 54mm. For portrait, width = 54mm, height = 85.6mm */
 const DPI = 300;
-const CARD_MM_W = 54.0;      // portrait width in mm
-const CARD_MM_H = 85.6;      // portrait height in mm
-const CARD_W = Math.round((CARD_MM_W / 25.4) * DPI); // pixels
+const CARD_MM_W = 54.0;
+const CARD_MM_H = 85.6;
+const CARD_W = Math.round((CARD_MM_W / 25.4) * DPI);
 const CARD_H = Math.round((CARD_MM_H / 25.4) * DPI);
 
-// A4 landscape at 300 DPI (3508×2480)
 const A4_W = 3508, A4_H = 2480;
-const GRID_COLS = 5, GRID_ROWS = 2; // 5 across, 2 down => 10 per page
+const GRID_COLS = 5, GRID_ROWS = 2;
+
+// =========================================================
+// 🛠️ ID CARD LAYOUT CONFIGURATION 🛠️
+// You said: "I will change the coordinates here is the id card"
+// So, I've exposed ALL the coordinates here so you can fine-tune
+// them instantly if your template shifts slightly!
+// These coordinates assume your template image width is around ~600px.
+// =========================================================
+const C = {
+    // 1. PHOTO BOX (Center Area)
+    photoX: 165,    // Starting X (Left edge of photo box)
+    photoY: 280,    // Starting Y (Top edge of photo box)
+    photoW: 280,    // Width of photo box
+    photoH: 340,    // Height of photo box
+
+    // 2. NAME TEXT (Centered below photo)
+    nameY: 675,           // The Y height to print the Name
+    nameColor: '#cc0000', // Hex color (e.g. #cc0000 = Dark Red)
+    nameFont: 48,         // Font size in pixels
+
+    // 3. DETAILS LIST (Father, Mother, Phone, Address)
+    // Looking at your image, these align left next to the colons ( : )
+    detailStartX: 300,    // The X position where the values start
+    detailStartY: 742,    // Y coordinate of the first line (Father's Name)
+    detailLineGap: 48,    // Vertical spacing between each line
+    detailColor: '#000000',
+    detailFont: 26,
+
+    // 4. QR CODE (Bottom Left)
+    qrX: 50,
+    qrY: 740,
+    qrSize: 180,
+
+    // 5. EXTRA DATA (Class, Roll, DOB, Blood Group)
+    // If you want to print them somewhere on the card, set showExtra to true
+    showExtra: false,
+    extraX: 420,
+    extraY: 230,
+    extraColor: '#000000',
+    extraFont: 20
+};
+// =========================================================
+
 
 /* ---------- Helpers ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
 function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (''+str).replace(/\d/g,d=>window.odiaDigits[d]||d); }
 function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
+
+// Lightweight helper to generate a canvas containing a QR code
+function getQRCodeCanvas(text) {
+    return new Promise((resolve) => {
+        if(typeof QRCode === 'undefined') return resolve(null);
+        const div = document.createElement('div');
+        new QRCode(div, { text: text || ' ', width: 256, height: 256, correctLevel: QRCode.CorrectLevel.L });
+        setTimeout(() => {
+            const canvas = div.querySelector('canvas');
+            resolve(canvas || null);
+        }, 50);
+    });
+}
 
 /* ---------- DOM ---------- */
 const tableBody = document.querySelector('#studentTable tbody');
@@ -152,6 +219,9 @@ const deleteAllNoBtn = document.getElementById('deleteAllNoBtn');
 const editModal = document.getElementById('editModal');
 const editId = document.getElementById('editId');
 const editName = document.getElementById('editName');
+const editFatherName = document.getElementById('editFatherName');
+const editMotherName = document.getElementById('editMotherName');
+const editAddress = document.getElementById('editAddress');
 const editClass = document.getElementById('editClass');
 const editRoll = document.getElementById('editRoll');
 const editDob = document.getElementById('editDob');
@@ -208,8 +278,13 @@ function renderTable(data){
   data.forEach(s=>{
     const tr=document.createElement('tr'); const photoSrc = s.photoBase64 || 'https://placehold.co/64?text=No+Photo';
     tr.innerHTML = `<td><img class="thumb" src="${photoSrc}" onclick="window.open('${photoSrc}')"></td>
-      <td>${escapeHtml(s.name||'')}</td><td>${escapeHtml(s.class||'')}</td><td>${escapeHtml(s.roll||'')}</td><td>${escapeHtml(s.dob||'')}</td>
-      <td>${escapeHtml(s.bloodGroup||'-')}</td><td>${escapeHtml(s.phone||'-')}</td><td>${escapeHtml(s.schoolName||'')}</td>
+      <td>${escapeHtml(s.name||'')}</td>
+      <td>${escapeHtml(s.fatherName||'-')}</td>
+      <td>${escapeHtml(s.motherName||'-')}</td>
+      <td>${escapeHtml(s.class||'')}</td>
+      <td>${escapeHtml(s.roll||'')}</td>
+      <td>${escapeHtml(s.phone||'-')}</td>
+      <td>${escapeHtml(s.schoolName||'')}</td>
       <td><button class="edit-btn" data-id="${s.id}">Edit</button> <button class="delete-btn" data-id="${s.id}" data-name="${escapeHtml(s.name||'this student')}">Delete</button></td>`;
     tableBody.appendChild(tr);
   });
@@ -247,11 +322,35 @@ async function deleteAllStudents(filterSchool){
 }
 
 /* ---------- Edit modal ---------- */
-function openEditModal(id){ const st = allStudents.find(s=>s.id.toString()===id.toString()); if(!st) return alert('Student not found'); editId.value=st.id; editName.value=st.name||''; editClass.value=st.class||''; editRoll.value=st.roll||''; editDob.value=st.dob||''; editPhone.value=st.phone||''; editBlood.value=st.bloodGroup||''; editModal.style.display='flex'; }
+function openEditModal(id){ 
+    const st = allStudents.find(s=>s.id.toString()===id.toString()); 
+    if(!st) return alert('Student not found'); 
+    editId.value=st.id; 
+    editName.value=st.name||''; 
+    editFatherName.value=st.fatherName||'';
+    editMotherName.value=st.motherName||'';
+    editAddress.value=st.address||'';
+    editClass.value=st.class||''; 
+    editRoll.value=st.roll||''; 
+    editDob.value=st.dob||''; 
+    editPhone.value=st.phone||''; 
+    editBlood.value=st.bloodGroup||''; 
+    editModal.style.display='flex'; 
+}
 cancelEditBtn.addEventListener('click', ()=> editModal.style.display='none');
 saveEditBtn.addEventListener('click', async () => {
   const id = editId.value; if(!id) return alert('Missing id');
-  const updated = { name: editName.value.trim(), class: editClass.value.trim(), roll: editRoll.value.trim(), dob: editDob.value||'', phone: editPhone.value.trim(), bloodGroup: editBlood.value||'' };
+  const updated = { 
+      name: editName.value.trim(), 
+      fatherName: editFatherName.value.trim(),
+      motherName: editMotherName.value.trim(),
+      address: editAddress.value.trim(),
+      class: editClass.value.trim(), 
+      roll: editRoll.value.trim(), 
+      dob: editDob.value||'', 
+      phone: editPhone.value.trim(), 
+      bloodGroup: editBlood.value||'' 
+  };
   try { await db.collection('students').doc(id.toString()).update(updated); const idx = allStudents.findIndex(s=>s.id.toString()===id.toString()); if(idx!==-1) allStudents[idx] = { ...allStudents[idx], ...updated }; renderTable(schoolFilter.value==='all'?allStudents:allStudents.filter(s=>s.schoolName===schoolFilter.value)); editModal.style.display='none'; alert('Saved'); } catch(err){ console.error(err); alert('Save failed: '+(err.message||err)); }
 });
 
@@ -275,7 +374,7 @@ async function loadVisionBundle(){
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
     "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
   ];
-  for(const c of candidates){ try{ const mod = await importVision(c); console.log('vision loaded from',c); return mod; } catch(e){ } }
+  for(const c of candidates){ try{ const mod = await importVision(c); return mod; } catch(e){ } }
   throw new Error('vision bundle failed');
 }
 async function initializeFaceDetector(){
@@ -285,7 +384,7 @@ async function initializeFaceDetector(){
     FaceDetector = mod.FaceDetector; FilesetResolver = mod.FilesetResolver;
     const wasmCandidates = ["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm","https://unpkg.com/@mediapipe/tasks-vision@0.10.14/wasm"];
     let fileset = null;
-    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); console.log('fileset from',w); break; }catch(e){ console.warn('fileset fail', w, e); } }
+    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); break; }catch(e){  } }
     if(!fileset) throw new Error('FilesetResolver failed');
     faceDetector = await FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5, runningMode:"IMAGE" });
     window.assets.aiModel = 'loaded'; updateStatus(); console.log('AI model loaded');
@@ -295,34 +394,30 @@ initializeFaceDetector();
 
 /* ---------- jsPDF helper ---------- */
 let jsPDFWrapper = null;
-async function ensureJsPDF(){ if(jsPDFWrapper) return jsPDFWrapper; if(window.jspdf && window.jspdf.jsPDF){ jsPDFWrapper = window.jspdf; return jsPDFWrapper; } try{ const mod = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); jsPDFWrapper = mod; return jsPDFWrapper; } catch(err){ console.error('jspdf load fail', err); throw err; } }
+async function ensureJsPDF(){ if(jsPDFWrapper) return jsPDFWrapper; if(window.jspdf && window.jspdf.jsPDF){ jsPDFWrapper = window.jspdf; return jsPDFWrapper; } try{ const mod = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); jsPDFWrapper = mod; return jsPDFWrapper; } catch(err){ throw err; } }
 
 /* ---------- Create single card image (CARD_W x CARD_H portrait) ---------- */
 async function generateCardImage(student){
   cardCanvas.width = CARD_W; cardCanvas.height = CARD_H;
   ctx.clearRect(0,0,CARD_W,CARD_H);
 
-  // draw template if available scaled to card size
+  // Calculate dynamic scale factor so user's CONFIG coordinates stay precise
+  const tplW = window.assets.templateWidth || CARD_W;
+  const scale = CARD_W / tplW;
+
+  // Draw background template
   if(window.assets.template){
     ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
   } else { ctx.fillStyle='#fff'; ctx.fillRect(0,0,CARD_W,CARD_H); }
 
-  // photo area: original template coordinates (from earlier working template) assume portrait scaling:
-  // We will compute a photo area by scaling original values proportionally to template width used before:
-  // Use reference original px/py/pw/ph (from previous code) but scale according to template orientation.
-  // For safety we compute using template width in earlier design (ORIG_TPL_W). If not available, fall back to simple top-center placement.
-
-  const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
-  const tplW = window.assets.templateWidth || CARD_W;
-  const scale = CARD_W / tplW;
-  const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
-  const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
+  // 1. Draw Photo Area
+  const px = Math.round(C.photoX * scale), py = Math.round(C.photoY * scale);
+  const pw = Math.round(C.photoW * scale), ph = Math.round(C.photoH * scale);
   const border = Math.max(2, Math.round(3 * scale));
 
   // black frame behind photo
   ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
-  // load student photo
   const photo = new Image(); let photoLoaded = false;
   if(student.photoBase64){
     photo.src = student.photoBase64;
@@ -335,19 +430,17 @@ async function generateCardImage(student){
       const det = faceDetector.detect(photo);
       if(det && det.detections && det.detections.length>0){
         const bbox = det.detections[0].boundingBox;
-        const img_w = photo.width, img_h = photo.height;
         let x1=bbox.originX, y1=bbox.originY, x2=bbox.originX + bbox.width, y2=bbox.originY + bbox.height;
         const bw = x2-x1, bh = y2-y1;
         const add_w = parseInt(bw * 0.6), add_h = parseInt(bh * 1.4);
         const new_x1 = Math.max(0, x1 - add_w/2), new_y1 = Math.max(0, y1 - add_h/2);
-        const new_x2 = Math.min(img_w, x2 + add_w/2), new_y2 = Math.min(img_h, y2 + add_h/2);
+        const new_x2 = Math.min(photo.width, x2 + add_w/2), new_y2 = Math.min(photo.height, y2 + add_h/2);
         sx = new_x1; sy = new_y1; sW = new_x2 - new_x1; sH = new_y2 - new_y1;
       } else {
         const targetRatio = pw / ph; const srcRatio = sW / sH;
         if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
       }
     }catch(e){
-      console.warn('per-image face detect failed', e);
       const targetRatio = pw / ph; const srcRatio = sW / sH;
       if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
     }
@@ -359,20 +452,58 @@ async function generateCardImage(student){
   if(photoLoaded){ ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph); }
   else { ctx.fillStyle = '#fff'; ctx.fillRect(px, py, pw, ph); }
 
-  // draw texts (scaled)
-  ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#000';
-  const baseFont = 38; ctx.font = `${Math.max(12, Math.round(baseFont * scale))}px OdiaFont, sans-serif`;
-  const textX = Math.round(227 * scale);
-  // format DOB
-  let dobFormatted = student.dob || '';
-  try{ const [y,m,d] = (student.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-  ctx.fillText(student.name || '', textX, Math.round((505 + 38) * scale));
-  ctx.fillText(student.class || '', textX, Math.round((575 + 38) * scale));
-  ctx.fillText(toOdiaDigits(dobFormatted), textX, Math.round((647 + 38) * scale));
-  ctx.fillText(toOdiaDigits(student.roll || ''), textX, Math.round((718 + 38) * scale));
-  ctx.fillText(toOdiaDigits(student.phone || ''), textX, Math.round((789 + 38) * scale));
 
-  if(student.bloodGroup){ ctx.fillStyle='#fff'; ctx.font = `${Math.max(10, Math.round(23 * scale))}px OdiaFont, sans-serif`; ctx.fillText(student.bloodGroup, Math.round(480 * scale), Math.round((360 + 23) * scale)); }
+  // 2. Draw Name
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = C.nameColor;
+  ctx.font = `bold ${Math.round(C.nameFont * scale)}px OdiaFont, sans-serif`;
+  ctx.fillText(student.name || '', Math.round(CARD_W / 2), Math.round(C.nameY * scale));
+
+  // 3. Draw Four Details (Father, Mother, Phone, Address)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = C.detailColor;
+  ctx.font = `${Math.round(C.detailFont * scale)}px OdiaFont, sans-serif`;
+
+  const vX = Math.round(C.detailStartX * scale);
+  let currentY = C.detailStartY;
+
+  const printLine = (text) => {
+      ctx.fillText(text, vX, Math.round(currentY * scale));
+      currentY += C.detailLineGap;
+  };
+
+  printLine(student.fatherName || '-');
+  printLine(student.motherName || '-');
+  printLine(toOdiaDigits(student.phone || '-'));
+  printLine(student.address || '-');
+
+
+  // 4. Generate & Draw QR Code
+  const qrDataText = `Name: ${student.name||''}\nFather: ${student.fatherName||''}\nClass: ${student.class||''}\nRoll: ${student.roll||''}\nPhone: ${student.phone||''}`;
+  const qrCanvas = await getQRCodeCanvas(qrDataText);
+  if(qrCanvas) {
+      ctx.drawImage(qrCanvas, Math.round(C.qrX * scale), Math.round(C.qrY * scale), Math.round(C.qrSize * scale), Math.round(C.qrSize * scale));
+  }
+
+
+  // 5. Draw Extra Config Details (Class, Roll, etc if enabled)
+  if (C.showExtra) {
+      ctx.fillStyle = C.extraColor;
+      ctx.font = `${Math.round(C.extraFont * scale)}px OdiaFont, sans-serif`;
+      let exY = C.extraY;
+      ctx.fillText(`Class: ${student.class || '-'}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
+      ctx.fillText(`Roll: ${toOdiaDigits(student.roll || '-')}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
+      
+      let dobFormatted = student.dob || '';
+      try{ const [y,m,d] = dobFormatted.split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
+      ctx.fillText(`DOB: ${toOdiaDigits(dobFormatted)}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
+      
+      if (student.bloodGroup) {
+            ctx.fillStyle = '#cc0000';
+            ctx.fillText(`Blood: ${student.bloodGroup}`, Math.round(C.extraX * scale), Math.round(exY * scale));
+      }
+  }
 
   return await new Promise(res => cardCanvas.toBlob(res,'image/png'));
 }
@@ -424,17 +555,14 @@ async function createA4Pages(singleImages){
 /* ---------- Create combined PDF: portrait pages (no borders) with tiled watermark ---------- */
 async function createCombinedPdf(singleImages){
   const mod = await ensureJsPDF(); const jsPDF = mod.jsPDF;
-  const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] }); // portrait page per card
+  const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] }); 
   let first = true;
   for(const item of singleImages){
-    // draw watermark tiled on a temp canvas same size as card
     const tmp = document.createElement('canvas'); tmp.width = CARD_W; tmp.height = CARD_H;
     const tctx = tmp.getContext('2d');
 
-    // draw card image full-bleed (no border)
     tctx.drawImage(item.img, 0, 0, CARD_W, CARD_H);
 
-    // tiled watermark
     const wm = 'AN DIGITAL';
     tctx.globalAlpha = 0.12; tctx.fillStyle = '#000';
     const fontSize = Math.round(Math.min(CARD_W, CARD_H) * 0.075);
@@ -496,9 +624,20 @@ generateBtn.addEventListener('click', async ()=>{
     const excelData = dataToGen.map(s => {
       let dobFormatted = s.dob || '';
       try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-      return { name: s.name||'', class: s.class||'', dob: toOdiaDigits(dobFormatted), bloodGroup: s.bloodGroup||'', rollno: toOdiaDigits(s.roll||''), phone: toOdiaDigits(s.phone||''), photo: (s.newPhotoName||'') };
+      return { 
+          name: s.name||'', 
+          fatherName: s.fatherName||'', 
+          motherName: s.motherName||'', 
+          address: s.address||'', 
+          class: s.class||'', 
+          dob: toOdiaDigits(dobFormatted), 
+          bloodGroup: s.bloodGroup||'', 
+          rollno: toOdiaDigits(s.roll||''), 
+          phone: toOdiaDigits(s.phone||''), 
+          photo: (s.newPhotoName||'') 
+      };
     });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','class','dob','bloodGroup','rollno','phone','photo'] });
+    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] });
     const wb = XLSX.utils.book_new();
     const sheetName = (val==='all' ? 'All_Schools' : val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Sheet1';
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -522,8 +661,11 @@ downloadZipBtn.addEventListener('click', async ()=>{
   try{
     const val = schoolFilter.value; const dataToExport = (val==='all')? allStudents : allStudents.filter(s=>s.schoolName===val);
     const zip = new JSZip(); dataToExport.forEach(s=>{ if(s.photoBase64){ const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); zip.file(`raw_data/${fname}`, s.photoBase64.split(',')[1], { base64:true }); }});
-    const excelData = dataToExport.map(s => { let dobFormatted = s.dob || ''; try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){} return { name:s.name||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', rollno:toOdiaDigits(s.roll||''), phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','class','dob','bloodGroup','rollno','phone','photo'] }); const wb = XLSX.utils.book_new(); let sheetName = (val==='all'?'All_Schools':val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31)||'Sheet1'; XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const excelData = dataToExport.map(s => { 
+        let dobFormatted = s.dob || ''; try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){} 
+        return { name:s.name||'', fatherName:s.fatherName||'', motherName:s.motherName||'', address:s.address||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', rollno:toOdiaDigits(s.roll||''), phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; 
+    });
+    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] }); const wb = XLSX.utils.book_new(); let sheetName = (val==='all'?'All_Schools':val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31)||'Sheet1'; XLSX.utils.book_append_sheet(wb, ws, sheetName);
     const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' }); zip.file('student_data.xlsx', excelArray);
     const blob = await zip.generateAsync({ type:'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${sheetName}_Backup.zip`; a.click();
   } catch(err){ console.error(err); alert('Error creating zip: ' + (err.message || err)); } finally { downloadZipBtn.disabled=false; downloadZipBtn.textContent='Download Raw Backup (ZIP)'; }
