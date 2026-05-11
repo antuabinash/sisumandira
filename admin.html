@@ -16,9 +16,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
-  <!-- Modern QRCode library for automated QR Generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
-
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
     .card { max-width:1100px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
@@ -148,8 +145,10 @@ const C = {
     photoW: 218,    // Width of photo box (426 - 208)
     photoH: 195,    // Height of photo box (542 - 347)
 
-    // 2. NAME TEXT (Centered below photo)
-    nameY: 675,           // The Y height to print the Name
+    // 2. NAME TEXT
+    nameX: 222,           // The X coordinate to print the Name
+    nameY: 609,           // The Y height to print the Name
+    nameAlign: 'center',  // Alignment (change to 'left' if 222 is the starting edge)
     nameColor: '#cc0000', // Hex color (e.g. #cc0000 = Dark Red)
     nameFont: 48,         // Font size in pixels
 
@@ -162,11 +161,6 @@ const C = {
     addressY: 832,
     detailColor: '#000000',
     detailFont: 26,
-
-    // 4. QR CODE (Bottom Left)
-    qrX: 50,
-    qrY: 740,
-    qrSize: 180,
 
     // 5. EXTRA DATA (Class, Roll, Blood Group)
     // If you want to print them somewhere on the card, set showExtra to true
@@ -183,28 +177,6 @@ const C = {
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
 function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (''+str).replace(/\d/g,d=>window.odiaDigits[d]||d); }
 function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
-
-// Lightweight helper to generate a canvas containing a QR code
-function getQRCodeCanvas(text) {
-    return new Promise((resolve) => {
-        if(typeof QRCode === 'undefined') return resolve(null);
-        const canvas = document.createElement('canvas');
-        
-        // Using the modern QRCode library which handles UTF-8 perfectly
-        QRCode.toCanvas(canvas, text || ' ', { 
-            errorCorrectionLevel: 'L',
-            margin: 1,
-            width: 256
-        }, function (error) {
-            if (error) {
-                console.error('QR Generation Error:', error);
-                resolve(null);
-            } else {
-                resolve(canvas);
-            }
-        });
-    });
-}
 
 /* ---------- DOM ---------- */
 const tableBody = document.querySelector('#studentTable tbody');
@@ -501,11 +473,11 @@ async function generateCardImage(student){
 
 
   // 2. Draw Name
-  ctx.textAlign = 'center';
+  ctx.textAlign = C.nameAlign;
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = C.nameColor;
   ctx.font = `bold ${Math.round(C.nameFont * scale)}px OdiaFont, sans-serif`;
-  ctx.fillText(student.name || '', Math.round(CARD_W / 2), Math.round(C.nameY * scale));
+  ctx.fillText(student.name || '', Math.round(C.nameX * scale), Math.round(C.nameY * scale));
 
   // 3. Draw Details (Father, Mother, Phone, DOB, Address) using explicit coordinates
   ctx.textAlign = 'left';
@@ -524,15 +496,6 @@ async function generateCardImage(student){
   ctx.fillText(toOdiaDigits(dobFormatted), dX, Math.round(C.dobY * scale));
   
   ctx.fillText(student.address || '-', dX, Math.round(C.addressY * scale));
-
-
-  // 4. Generate & Draw QR Code
-  const qrDataText = `Name: ${student.name||''}\nFather: ${student.fatherName||''}\nClass: ${student.class||''}\nRoll: ${student.roll||''}\nPhone: ${student.phone||''}`;
-  const qrCanvas = await getQRCodeCanvas(qrDataText);
-  if(qrCanvas) {
-      ctx.drawImage(qrCanvas, Math.round(C.qrX * scale), Math.round(C.qrY * scale), Math.round(C.qrSize * scale), Math.round(C.qrSize * scale));
-  }
-
 
   // 5. Draw Extra Config Details (Class, Roll, etc if enabled)
   if (C.showExtra) {
