@@ -18,60 +18,69 @@
 
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
-    .card { max-width:1100px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
-    h1{ color:#0b53a0; margin:0 0 12px 0; }
+    .card { max-width:1200px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
+    h1{ color:#0b53a0; margin:0 0 12px 0; text-align:center; }
     .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
     select,input[type=file],button { padding:10px; border-radius:6px; border:1px solid #ccc; font-size:15px; }
-    button{ background:#28a745;color:#fff;border:none;cursor:pointer; }
+    button{ background:#28a745;color:#fff;border:none;cursor:pointer; transition: opacity 0.2s; }
+    button:hover{ opacity: 0.9; }
     button:disabled{ background:#999; cursor:not-allowed; }
-    #downloadZipBtn{ background:#ffc107;color:#222; }
-    .table-container { overflow-x: auto; }
-    table{ width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; min-width:800px; }
-    th,td{ padding:10px; border:1px solid #e6eef6; vertical-align:middle; text-align:left; }
-    th{ background:#0b69d1; color:#fff; }
-    img.thumb{ width:54px; height:54px; object-fit:cover; border-radius:6px; cursor:pointer; }
+    
+    /* School Tile Styles */
+    .school-tile { background: #fff; border: 1px solid #e1e8ed; border-radius: 10px; margin-bottom: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); overflow: hidden; }
+    .school-header { background: #f8f9fa; padding: 16px 20px; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .school-title { margin: 0; color: #0b53a0; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
+    .badge { background: #0b53a0; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .school-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    
+    .table-container { overflow-x: auto; padding: 0 20px 20px 20px; }
+    table{ width:100%; border-collapse:collapse; margin-top:15px; font-size:14px; min-width:850px; }
+    th,td{ padding:10px; border-bottom:1px solid #e6eef6; vertical-align:middle; text-align:left; }
+    th{ background:#f1f5f9; color:#334155; font-weight: 600; }
+    tbody tr:hover { background: #f8fafc; }
+    
+    img.thumb{ width:50px; height:50px; object-fit:cover; border-radius:6px; cursor:pointer; border: 1px solid #eee; }
+    .checkbox-cell { width: 40px; text-align: center; }
+    input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+    
     .modal{ display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; z-index:2000}
     .modal-content{ background:#fff; padding:18px; border-radius:8px; width:90%; max-width:600px; }
     .modal-buttons{ display:flex; gap:10px; margin-top:12px; }
     .generator-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
-    @media(max-width:720px){ .generator-grid{ grid-template-columns:1fr } table{ font-size:13px } }
+    @media(max-width:720px){ .generator-grid{ grid-template-columns:1fr } table{ font-size:13px } .school-header{ flex-direction: column; align-items: flex-start; } }
   </style>
 </head>
 <body>
   <h1>Admin Panel: Student Data & ID Generator</h1>
 
   <div class="card">
-    <h2 style="margin:0 0 10px 0">ID Card Generator — Saraswati Vidya Mandir Layout</h2>
+    <h2 style="margin:0 0 10px 0">1. Setup Generator (Saraswati Vidya Mandir Layout)</h2>
     <div class="generator-grid">
       <div>
-        <label>1. Upload Template (.png / .jpg)</label><br>
-        <input id="templateInput" type="file" accept="image/png, image/jpeg">
+        <label>Upload Template (.png / .jpg)</label><br>
+        <input id="templateInput" type="file" accept="image/png, image/jpeg" style="width: 100%; box-sizing: border-box;">
       </div>
       <div>
-        <label>2. Upload Odia Font (.ttf)</label><br>
-        <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf">
+        <label>Upload Odia Font (.ttf)</label><br>
+        <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf" style="width: 100%; box-sizing: border-box;">
       </div>
-      <button id="generateBtn" disabled style="grid-column:1 / -1; margin-top:6px;">Generate & Download ID Cards (ZIP)</button>
     </div>
-    <p id="generatorStatus" style="font-style:italic;color:#555;margin-top:10px">Status: ❌ Template, ❌ Font, ⏳ AI Model...</p>
+    <div style="margin-top:12px; padding: 10px; background: #eef2f5; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+      <span id="generatorStatus" style="font-weight: 600; color:#333;">Status: ❌ Template, ❌ Font, ⏳ AI Model...</span>
+      <span style="font-size: 13px; color: #666;">You must upload both to enable generation features below.</span>
+    </div>
   </div>
 
-  <div class="card">
-    <h2 style="margin:0 0 10px 0">Student Data</h2>
-    <div class="controls">
-      <select id="schoolFilter"><option value="all">All Schools</option></select>
-      <button id="refreshBtn" style="background:#17a2b8">Refresh Data</button>
-      <button id="downloadZipBtn">Download Raw Backup (ZIP)</button>
-      <button id="deleteAllBtn" style="background:#dc3545;color:#fff">Delete All</button>
+  <div class="card" style="background: transparent; box-shadow: none; padding: 0;">
+    <div class="controls" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+      <h2 style="margin:0; flex-grow: 1;">2. School Data Tiles</h2>
+      <button id="refreshBtn" style="background:#17a2b8">Refresh All Data</button>
+      <button id="deleteAllBtn" style="background:#dc3545;color:#fff">Delete Database</button>
     </div>
 
-    <div class="table-container">
-        <table id="studentTable" aria-live="polite">
-          <thead>
-            <tr><th>Photo</th><th>Name</th><th>Father's Name</th><th>Mother's Name</th><th>Class</th><th>Roll</th><th>Phone</th><th>School</th><th>Actions</th></tr>
-          </thead>
-          <tbody><tr><td colspan="9">Loading data...</td></tr></tbody>
-        </table>
+    <!-- School Tiles will be injected here -->
+    <div id="schoolsContainer">
+      <div style="text-align: center; padding: 40px; background: #fff; border-radius: 8px; color: #666;">Loading student data...</div>
     </div>
   </div>
 
@@ -80,11 +89,11 @@
   <!-- Confirm modals -->
   <div id="confirmModal" class="modal"><div class="modal-content">
     <p id="confirmText">Are you sure?</p>
-    <div class="modal-buttons"><button id="confirmYesBtn" style="background:#dc3545;color:#fff">Yes, delete</button><button id="confirmNoBtn">Cancel</button></div>
+    <div class="modal-buttons"><button id="confirmYesBtn" style="background:#dc3545;color:#fff">Yes, proceed</button><button id="confirmNoBtn">Cancel</button></div>
   </div></div>
 
   <div id="deleteAllModal" class="modal"><div class="modal-content">
-    <p id="deleteAllText">Delete ALL student records?</p>
+    <p id="deleteAllText">Delete ALL student records in database?</p>
     <div class="modal-buttons"><button id="deleteAllYesBtn" style="background:#dc3545;color:#fff">Delete All</button><button id="deleteAllNoBtn">Cancel</button></div>
   </div></div>
 
@@ -133,10 +142,6 @@ const GRID_COLS = 5, GRID_ROWS = 2;
 
 // =========================================================
 // 🛠️ ID CARD LAYOUT CONFIGURATION 🛠️
-// You said: "I will change the coordinates here is the id card"
-// So, I've exposed ALL the coordinates here so you can fine-tune
-// them instantly if your template shifts slightly!
-// These coordinates assume your template image width is around ~600px.
 // =========================================================
 const C = {
     // 1. PHOTO BOX (Center Area)
@@ -154,22 +159,20 @@ const C = {
 
     // 3. DETAILS LIST (Father, Mother, Phone, DOB, Address)
     detailX: 321,         // Universal X coordinate for the details text
-    fatherY: 680,         // Started a little below 672
-    motherY: 720,         // Exactly +40px difference
-    phoneY: 764,         // Exactly +40px difference
-    dobY: 806,           // Exactly +40px difference
-    addressY: 848,       // Exactly +40px difference
+    fatherY: 680,         
+    motherY: 720,         
+    phoneY: 764,         
+    dobY: 806,           
+    addressY: 848,       
     detailColor: '#02254b',
     detailFont: 26,
 
     // 4. BLOOD GROUP
     bloodX: 474,
     bloodY: 474,
-    bloodColor: '#ffffff', // Dark Red for blood group
+    bloodColor: '#ffffff', // White for blood group
     bloodFont: 18,
 
-    // 5. EXTRA DATA (Class, Roll)
-    // If you want to print them somewhere on the card, set showExtra to true
     showExtra: false,
     extraX: 420,
     extraY: 230,
@@ -185,12 +188,9 @@ function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (
 function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
 
 /* ---------- DOM ---------- */
-const tableBody = document.querySelector('#studentTable tbody');
-const schoolFilter = document.getElementById('schoolFilter');
+const schoolsContainer = document.getElementById('schoolsContainer');
 const refreshBtn = document.getElementById('refreshBtn');
-const downloadZipBtn = document.getElementById('downloadZipBtn');
 const deleteAllBtn = document.getElementById('deleteAllBtn');
-const generateBtn = document.getElementById('generateBtn');
 const templateInput = document.getElementById('templateInput');
 const fontInput = document.getElementById('fontInput');
 const generatorStatus = document.getElementById('generatorStatus');
@@ -225,9 +225,10 @@ const ctx = cardCanvas.getContext('2d');
 /* ---------- State ---------- */
 let db = null;
 let allStudents = [];
+let groupedStudents = {};
 let idToDelete = null;
-let deleteFilter = null;
-window.assets = { template:null, templateWidth:0, templateHeight:0, font:null, aiModel:'pending' };
+let customConfirmCallback = null;
+window.assets = { template:null, templateWidth:0, templateHeight:0, font:null, aiModel:'pending', isReady: false };
 
 /* ---------- Firebase init ---------- */
 try{
@@ -244,107 +245,186 @@ try{
   db = firebase.firestore();
   window.db = db;
   loadData();
-} catch(e){ console.error('Firebase init failed', e); alert('Firebase init failed: '+(e.message||e)); }
+} catch(e){ console.error('Firebase init failed', e); schoolsContainer.innerHTML = `<div style="padding: 20px; color: red;">Firebase init failed: ${escapeHtml(e.message||e)}</div>`; }
 
-/* ---------- Load & render ---------- */
+/* ---------- Load & Render Schools ---------- */
 function loadData(){
-  tableBody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
+  schoolsContainer.innerHTML = '<div style="text-align: center; padding: 40px; background: #fff; border-radius: 8px;">Refreshing data from server...</div>';
   if(!db) return;
   db.collection('students').get().then(qs=>{
-    allStudents = []; const schools = new Set();
-    qs.forEach(doc=>{ const d=doc.data(); allStudents.push(d); if(d.schoolName) schools.add(d.schoolName); });
+    allStudents = []; 
+    qs.forEach(doc=>{ const d=doc.data(); allStudents.push(d); });
     allStudents.sort((a,b)=> (b.submittedAt?.toMillis()||0) - (a.submittedAt?.toMillis()||0));
     window.allStudents = allStudents;
-    populateSchoolFilter(schools);
-    renderTable(allStudents);
-    updateDeleteButton();
-  }).catch(err=>{ console.error(err); tableBody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message||err)}</td></tr>`; updateDeleteButton(); });
+    
+    // Group by school
+    groupedStudents = allStudents.reduce((acc, s) => {
+      const sName = s.schoolName || 'Unknown School';
+      if(!acc[sName]) acc[sName] = [];
+      acc[sName].push(s);
+      return acc;
+    }, {});
+
+    renderSchoolTiles();
+    updateGlobalDeleteButton();
+  }).catch(err=>{ console.error(err); schoolsContainer.innerHTML = `<div style="padding: 20px; color: red;">Error: ${escapeHtml(err.message||err)}</div>`; updateGlobalDeleteButton(); });
 }
-function populateSchoolFilter(set){ schoolFilter.innerHTML = '<option value="all">All Schools</option>'; Array.from(set).forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; schoolFilter.appendChild(o); }); }
-function renderTable(data){
-  tableBody.innerHTML = '';
-  if(!data||data.length===0){ tableBody.innerHTML = '<tr><td colspan="9">No data found.</td></tr>'; return; }
-  data.forEach(s=>{
-    const tr=document.createElement('tr'); const photoSrc = s.photoBase64 || 'https://placehold.co/64?text=No+Photo';
-    tr.innerHTML = `<td><img class="thumb" src="${photoSrc}" onclick="window.open('${photoSrc}')"></td>
-      <td>${escapeHtml(s.name||'')}</td>
-      <td>${escapeHtml(s.fatherName||'-')}</td>
-      <td>${escapeHtml(s.motherName||'-')}</td>
-      <td>${escapeHtml(s.class||'')}</td>
-      <td>${escapeHtml(s.roll||'')}</td>
-      <td>${escapeHtml(s.phone||'-')}</td>
-      <td>${escapeHtml(s.schoolName||'')}</td>
-      <td>
-        <button class="generate-btn" data-id="${s.id}" style="background:#007bff; color:#fff; padding:6px; font-size:12px; margin-right:4px;" title="Generate Single Card">Card</button>
-        <button class="edit-btn" data-id="${s.id}" style="padding:6px; font-size:12px; margin-right:4px;">Edit</button> 
-        <button class="delete-btn" data-id="${s.id}" data-name="${escapeHtml(s.name||'this student')}" style="background:#dc3545; color:#fff; padding:6px; font-size:12px; border:none;">Delete</button>
-      </td>`;
-    tableBody.appendChild(tr);
+
+function renderSchoolTiles() {
+  schoolsContainer.innerHTML = '';
+  const schoolNames = Object.keys(groupedStudents).sort();
+  
+  if(schoolNames.length === 0) {
+    schoolsContainer.innerHTML = '<div style="text-align: center; padding: 40px; background: #fff; border-radius: 8px; color: #666;">No students found in the database.</div>';
+    return;
+  }
+
+  schoolNames.forEach((schoolName, index) => {
+    const students = groupedStudents[schoolName];
+    const safeId = 'school_' + index;
+
+    const tile = document.createElement('div');
+    tile.className = 'school-tile';
+    
+    // Build Table Rows
+    let rowsHtml = '';
+    students.forEach(s => {
+      const photoSrc = s.photoBase64 || 'https://placehold.co/64?text=No+Photo';
+      rowsHtml += `
+        <tr>
+          <td class="checkbox-cell"><input type="checkbox" class="student-cb" data-school="${escapeHtml(schoolName)}" value="${s.id}"></td>
+          <td><img class="thumb" src="${photoSrc}" onclick="window.open('${photoSrc}')"></td>
+          <td><strong>${escapeHtml(s.name||'')}</strong></td>
+          <td>${escapeHtml(s.fatherName||'-')}</td>
+          <td>${escapeHtml(s.class||'')}</td>
+          <td>${escapeHtml(s.roll||'')}</td>
+          <td>${escapeHtml(s.phone||'-')}</td>
+          <td>
+            <button class="generate-btn" data-id="${s.id}" style="background:#007bff; color:#fff; padding:6px 10px; font-size:12px; margin-right:4px;" title="Generate Single Card">Card</button>
+            <button class="edit-btn" data-id="${s.id}" style="padding:6px 10px; font-size:12px; margin-right:4px; background:#e2e8f0; color:#334155;">Edit</button> 
+            <button class="delete-btn" data-id="${s.id}" data-name="${escapeHtml(s.name||'this student')}" style="background:#ef4444; color:#fff; padding:6px 10px; font-size:12px;">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tile.innerHTML = `
+      <div class="school-header">
+        <h3 class="school-title">🏫 ${escapeHtml(schoolName)} <span class="badge">${students.length}</span></h3>
+        <div class="school-actions">
+            <button class="generate-selected-btn" data-school="${escapeHtml(schoolName)}" style="background:#10b981; font-weight: bold;">Gen. Selected IDs</button>
+            <button class="export-raw-btn" data-school="${escapeHtml(schoolName)}" style="background:#f59e0b; color:#fff;">Raw Backup</button>
+            <button class="delete-school-btn" data-school="${escapeHtml(schoolName)}" style="background:#ef4444;">Clear School</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th class="checkbox-cell"><input type="checkbox" class="select-all-cb" data-school="${escapeHtml(schoolName)}" title="Select All"></th>
+              <th>Photo</th><th>Name</th><th>Father</th><th>Class</th><th>Roll</th><th>Phone</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+    schoolsContainer.appendChild(tile);
   });
 }
 
-/* ---------- Table actions ---------- */
-tableBody.addEventListener('click', e=>{
-  if(e.target.classList.contains('delete-btn')){
-    idToDelete = e.target.dataset.id; const nm = e.target.dataset.name || 'this student';
+/* ---------- Delegated Event Listeners for Dynamic Tiles ---------- */
+schoolsContainer.addEventListener('click', e => {
+  const target = e.target;
+  
+  // Select All Checkbox
+  if(target.classList.contains('select-all-cb')) {
+    const school = target.dataset.school;
+    const isChecked = target.checked;
+    const checkboxes = document.querySelectorAll(`.student-cb[data-school="${school}"]`);
+    checkboxes.forEach(cb => cb.checked = isChecked);
+  }
+  
+  // Individual action buttons
+  if(target.classList.contains('delete-btn')){
+    idToDelete = target.dataset.id; 
+    const nm = target.dataset.name || 'this student';
     confirmText.textContent = `Are you sure you want to permanently delete ${nm}? This cannot be undone.`;
+    customConfirmCallback = () => { if(idToDelete) deleteStudent(idToDelete); };
     confirmModal.style.display = 'flex';
-  } else if(e.target.classList.contains('edit-btn')){
-    openEditModal(e.target.dataset.id);
-  } else if(e.target.classList.contains('generate-btn')){
-    generateSingleCard(e.target);
+  } else if(target.classList.contains('edit-btn')){
+    openEditModal(target.dataset.id);
+  } else if(target.classList.contains('generate-btn')){
+    generateSingleCard(target);
+  } 
+  
+  // School Tile Actions
+  else if(target.classList.contains('generate-selected-btn')){
+    generateBatchForSchool(target.dataset.school, target);
+  } else if(target.classList.contains('export-raw-btn')){
+    exportRawSchoolData(target.dataset.school, target);
+  } else if(target.classList.contains('delete-school-btn')){
+    const school = target.dataset.school;
+    confirmText.textContent = `Are you sure you want to delete EVERY record for "${school}"? This cannot be undone.`;
+    customConfirmCallback = () => { deleteSchoolRecords(school); };
+    confirmModal.style.display = 'flex';
   }
 });
 
-async function generateSingleCard(btn) {
-  if(!window.assets.template || !window.assets.font) return alert('Please upload template and font first.');
-  if(window.assets.aiModel === 'pending') return alert('AI is still initializing. Wait a moment.');
-  
-  const id = btn.dataset.id;
-  const student = allStudents.find(s => s.id.toString() === id.toString());
-  if(!student) return alert('Student not found');
-  
-  const origText = btn.textContent;
-  btn.textContent = '⏳';
-  btn.disabled = true;
-  
-  try {
-    const blob = await generateCardImage(student);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); 
-    a.href = url;
-    a.download = `${(student.name||'student').replace(/\s+/g,'_')}_${student.roll||''}_Card.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch(err) {
-    console.error(err); 
-    alert('Generation failed: ' + (err.message || err));
-  } finally {
-    btn.textContent = origText; 
-    btn.disabled = false;
-  }
-}
-
-confirmNoBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; idToDelete=null; });
-confirmYesBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; if(idToDelete) deleteStudent(idToDelete); idToDelete=null; });
+/* ---------- Common Modals ---------- */
+confirmNoBtn.addEventListener('click', ()=>{ confirmModal.style.display='none'; idToDelete=null; customConfirmCallback=null; });
+confirmYesBtn.addEventListener('click', ()=>{ 
+    confirmModal.style.display='none'; 
+    if(customConfirmCallback) customConfirmCallback(); 
+    idToDelete=null; customConfirmCallback=null; 
+});
 
 function deleteStudent(id){
   if(!db) return;
-  db.collection('students').doc(id.toString()).delete().then(()=>{ allStudents = allStudents.filter(s=>s.id.toString()!==id.toString()); renderTable(schoolFilter.value==='all'?allStudents:allStudents.filter(s=>s.schoolName===schoolFilter.value)); updateDeleteButton(); }).catch(err=>{ console.error(err); alert('Delete failed: '+(err.message||err)); });
+  db.collection('students').doc(id.toString()).delete().then(()=>{ 
+      loadData(); // Just reload to re-render grouping cleanly
+  }).catch(err=>{ console.error(err); alert('Delete failed: '+(err.message||err)); });
 }
 
-/* ---------- Delete All ---------- */
-deleteAllBtn.addEventListener('click', ()=>{ const val=schoolFilter.value; deleteFilter = (val==='all')?null:val; deleteAllText.textContent = deleteFilter ? `Delete ALL records for "${deleteFilter}"?` : 'Delete ALL student records?'; deleteAllModal.style.display='flex'; });
-deleteAllNoBtn.addEventListener('click', ()=>{ deleteAllModal.style.display='none'; deleteFilter=null; });
-deleteAllYesBtn.addEventListener('click', async ()=>{ deleteAllModal.style.display='none'; if(!confirm('This will permanently delete the selected records. Proceed?')) return; try{ await deleteAllStudents(deleteFilter); alert('Delete completed'); loadData(); }catch(err){ console.error(err); alert('Delete failed: '+(err.message||err)) } finally { deleteFilter=null; } });
-
-async function deleteAllStudents(filterSchool){
-  if(!db) throw new Error('Firestore not initialized');
-  let query = db.collection('students'); if(filterSchool) query = query.where('schoolName','==',filterSchool);
-  const snap = await query.get(); if(snap.empty) return;
-  const docs = snap.docs; const chunkSize = 400;
-  for(let i=0;i<docs.length;i+=chunkSize){ const batch = db.batch(); docs.slice(i,i+chunkSize).forEach(d=>batch.delete(d.ref)); await batch.commit(); }
+async function deleteSchoolRecords(schoolName){
+  if(!db) return;
+  try{
+      let query = db.collection('students').where('schoolName','==',schoolName);
+      const snap = await query.get(); 
+      if(snap.empty) return;
+      const batch = db.batch(); 
+      snap.docs.forEach(d=>batch.delete(d.ref)); 
+      await batch.commit();
+      alert(`Deleted ${snap.size} records for ${schoolName}`);
+      loadData();
+  } catch(e) {
+      alert('Failed to clear school: ' + e.message);
+  }
 }
+
+/* ---------- Delete ALL ---------- */
+deleteAllBtn.addEventListener('click', ()=>{ 
+    deleteAllText.textContent = 'Delete ALL student records across ALL schools?'; 
+    deleteAllModal.style.display='flex'; 
+});
+deleteAllNoBtn.addEventListener('click', ()=>{ deleteAllModal.style.display='none'; });
+deleteAllYesBtn.addEventListener('click', async ()=>{ 
+    deleteAllModal.style.display='none'; 
+    if(!confirm('DANGER: This permanently wipes the entire database. Proceed?')) return; 
+    try{ 
+        const snap = await db.collection('students').get();
+        if(snap.empty) return;
+        const docs = snap.docs; const chunkSize = 400;
+        for(let i=0;i<docs.length;i+=chunkSize){ 
+            const batch = db.batch(); 
+            docs.slice(i,i+chunkSize).forEach(d=>batch.delete(d.ref)); 
+            await batch.commit(); 
+        }
+        alert('Complete database wiped.'); loadData(); 
+    }catch(err){ alert('Delete failed: '+(err.message||err)) }
+});
 
 /* ---------- Edit modal ---------- */
 function openEditModal(id){ 
@@ -376,11 +456,13 @@ saveEditBtn.addEventListener('click', async () => {
       phone: editPhone.value.trim(), 
       bloodGroup: editBlood.value||'' 
   };
-  try { await db.collection('students').doc(id.toString()).update(updated); const idx = allStudents.findIndex(s=>s.id.toString()===id.toString()); if(idx!==-1) allStudents[idx] = { ...allStudents[idx], ...updated }; renderTable(schoolFilter.value==='all'?allStudents:allStudents.filter(s=>s.schoolName===schoolFilter.value)); editModal.style.display='none'; alert('Saved'); } catch(err){ console.error(err); alert('Save failed: '+(err.message||err)); }
+  try { 
+      await db.collection('students').doc(id.toString()).update(updated); 
+      editModal.style.display='none'; 
+      loadData(); // reload groups
+  } catch(err){ console.error(err); alert('Save failed: '+(err.message||err)); }
 });
 
-/* ---------- Filter & refresh ---------- */
-schoolFilter.addEventListener('change', ()=>{ const v=schoolFilter.value; renderTable(v==='all'?allStudents:allStudents.filter(s=>s.schoolName===v)); updateDeleteButton(); });
 refreshBtn.addEventListener('click', loadData);
 
 /* ---------- Template & Font handling ---------- */
@@ -388,7 +470,15 @@ templateInput.addEventListener('change', e=>{ const f = e.target.files[0]; if(!f
 fontInput.addEventListener('change', async e=>{ const f = e.target.files[0]; if(!f) return; try{ const buf = await f.arrayBuffer(); window.assets.font = new FontFace('OdiaFont', buf); document.fonts.add(window.assets.font); await window.assets.font.load(); updateStatus(); } catch(err){ console.error('font load err', err); generatorStatus.textContent='Error loading font'; } });
 
 /* ---------- Status UI ---------- */
-function updateStatus(){ const t = window.assets.template ? '✅ Template' : '❌ Template'; const fo = window.assets.font ? '✅ Font' : '❌ Font'; let ai='⏳ AI Model...'; if(window.assets.aiModel==='loaded') ai='✅ AI Model'; if(window.assets.aiModel==='failed') ai='⚠️ AI (Fallback)'; generatorStatus.textContent = `Status: ${t}, ${fo}, ${ai}`; generateBtn.disabled = !(window.assets.template && window.assets.font && (window.assets.aiModel==='loaded' || window.assets.aiModel==='failed')); }
+function updateStatus(){ 
+    const t = window.assets.template ? '✅ Template' : '❌ Template'; 
+    const fo = window.assets.font ? '✅ Font' : '❌ Font'; 
+    let ai='⏳ AI Model...'; 
+    if(window.assets.aiModel==='loaded') ai='✅ AI Model'; 
+    if(window.assets.aiModel==='failed') ai='⚠️ AI (Fallback)'; 
+    generatorStatus.textContent = `Status: ${t}, ${fo}, ${ai}`; 
+    window.assets.isReady = (window.assets.template && window.assets.font && (window.assets.aiModel==='loaded' || window.assets.aiModel==='failed')); 
+}
 setInterval(updateStatus, 800);
 
 /* ---------- Mediapipe face detector loader (robust) ---------- */
@@ -421,26 +511,21 @@ initializeFaceDetector();
 let jsPDFWrapper = null;
 async function ensureJsPDF(){ if(jsPDFWrapper) return jsPDFWrapper; if(window.jspdf && window.jspdf.jsPDF){ jsPDFWrapper = window.jspdf; return jsPDFWrapper; } try{ const mod = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); jsPDFWrapper = mod; return jsPDFWrapper; } catch(err){ throw err; } }
 
-/* ---------- Create single card image (CARD_W x CARD_H portrait) ---------- */
+/* ---------- Single Card Rendering ---------- */
 async function generateCardImage(student){
   cardCanvas.width = CARD_W; cardCanvas.height = CARD_H;
   ctx.clearRect(0,0,CARD_W,CARD_H);
 
-  // Calculate dynamic scale factor so user's CONFIG coordinates stay precise
   const tplW = window.assets.templateWidth || CARD_W;
   const scale = CARD_W / tplW;
 
-  // Draw background template
-  if(window.assets.template){
-    ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
-  } else { ctx.fillStyle='#fff'; ctx.fillRect(0,0,CARD_W,CARD_H); }
+  if(window.assets.template){ ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H); } 
+  else { ctx.fillStyle='#fff'; ctx.fillRect(0,0,CARD_W,CARD_H); }
 
-  // 1. Draw Photo Area
   const px = Math.round(C.photoX * scale), py = Math.round(C.photoY * scale);
   const pw = Math.round(C.photoW * scale), ph = Math.round(C.photoH * scale);
   const border = Math.max(2, Math.round(3 * scale));
 
-  // black frame behind photo
   ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
   const photo = new Image(); let photoLoaded = false;
@@ -477,40 +562,33 @@ async function generateCardImage(student){
   if(photoLoaded){ ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph); }
   else { ctx.fillStyle = '#fff'; ctx.fillRect(px, py, pw, ph); }
 
-
-  // 2. Draw Name
   ctx.textAlign = C.nameAlign;
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = C.nameColor;
   ctx.font = `bold ${Math.round(C.nameFont * scale)}px OdiaFont, sans-serif`;
   ctx.fillText(student.name || '', Math.round(C.nameX * scale), Math.round(C.nameY * scale));
 
-  // 3. Draw Details (Father, Mother, Phone, DOB, Address) using explicit coordinates
   ctx.textAlign = 'left';
   ctx.fillStyle = C.detailColor;
   ctx.font = `${Math.round(C.detailFont * scale)}px OdiaFont, sans-serif`;
 
   const dX = Math.round(C.detailX * scale);
-
   ctx.fillText(student.fatherName || '-', dX, Math.round(C.fatherY * scale));
   ctx.fillText(student.motherName || '-', dX, Math.round(C.motherY * scale));
   ctx.fillText(toOdiaDigits(student.phone || '-'), dX, Math.round(C.phoneY * scale));
   
-  // Format Date of Birth
   let dobFormatted = student.dob || '-';
   try{ const [y,m,d] = dobFormatted.split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
   ctx.fillText(toOdiaDigits(dobFormatted), dX, Math.round(C.dobY * scale));
   
   ctx.fillText(student.address || '-', dX, Math.round(C.addressY * scale));
 
-  // 4. Draw Blood Group
   if (student.bloodGroup) {
       ctx.fillStyle = C.bloodColor;
       ctx.font = `bold ${Math.round(C.bloodFont * scale)}px OdiaFont, sans-serif`;
       ctx.fillText(student.bloodGroup, Math.round(C.bloodX * scale), Math.round(C.bloodY * scale));
   }
 
-  // 5. Draw Extra Config Details (Class, Roll, etc if enabled)
   if (C.showExtra) {
       ctx.fillStyle = C.extraColor;
       ctx.font = `${Math.round(C.extraFont * scale)}px OdiaFont, sans-serif`;
@@ -522,7 +600,128 @@ async function generateCardImage(student){
   return await new Promise(res => cardCanvas.toBlob(res,'image/png'));
 }
 
-/* ---------- Create A4 pages with portrait cards (5×2) ---------- */
+/* ---------- ID Generation Button Handlers ---------- */
+
+async function generateSingleCard(btn) {
+  if(!window.assets.isReady) return alert('Please upload Template and Odia Font at the top of the page first.');
+  const id = btn.dataset.id;
+  const student = allStudents.find(s => s.id.toString() === id.toString());
+  if(!student) return alert('Student not found');
+  
+  const origText = btn.textContent;
+  btn.textContent = '⏳'; btn.disabled = true;
+  try {
+    const blob = await generateCardImage(student);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `${(student.name||'student').replace(/\s+/g,'_')}_${student.roll||''}_Card.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch(err) { alert('Generation failed: ' + (err.message || err)); } 
+  finally { btn.textContent = origText; btn.disabled = false; }
+}
+
+async function generateBatchForSchool(schoolName, btn) {
+    if(!window.assets.isReady) return alert('Please upload Template and Odia Font at the top of the page first.');
+    
+    // Find selected checkboxes for this school
+    const checkboxes = document.querySelectorAll(`.student-cb[data-school="${schoolName}"]:checked`);
+    if(checkboxes.length === 0) return alert('Please check at least one student to generate cards.');
+
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    const dataToGen = groupedStudents[schoolName].filter(s => selectedIds.includes(s.id.toString()));
+
+    const origText = btn.textContent;
+    btn.textContent = `⏳ Gen ${dataToGen.length}...`; btn.disabled = true;
+
+    try {
+        await processAndDownloadZip(dataToGen, schoolName);
+    } catch(err) {
+        console.error('Generation failed', err); alert('Generation failed: ' + (err.message || err));
+    } finally {
+        btn.textContent = origText; btn.disabled = false;
+    }
+}
+
+async function processAndDownloadZip(dataToGen, schoolName) {
+    const zip = new JSZip();
+    const rawFolder = zip.folder('raw_data');
+    const singlesFolder = zip.folder('single_cards');
+    const a4Folder = zip.folder('a4_pages');
+
+    const singleImages = [];
+    
+    // Generate Cards
+    for(const st of dataToGen){
+      if(st.photoBase64){ const fname = (st.newPhotoName || `${(st.name||'photo').replace(/\s+/g,'_')}_${st.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); rawFolder.file(fname, st.photoBase64.split(',')[1], { base64:true }); }
+      const blob = await generateCardImage(st);
+      const filename = `${(st.name||'student').replace(/\s+/g,'_')}_${st.roll||''}.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
+      singlesFolder.file(filename, await blobToArrayBuffer(blob));
+      const img = new Image(); img.src = URL.createObjectURL(blob); await new Promise((r,rej)=>{ img.onload=r; img.onerror=rej; });
+      singleImages.push({ id: st.id, name: filename, blob, img, student: st });
+    }
+
+    // A4 Pages
+    const a4Pages = await createA4Pages(singleImages);
+    for(let i=0;i<a4Pages.length;i++){ a4Folder.file(`a4_landscape_page_${i+1}.png`, await blobToArrayBuffer(a4Pages[i])); }
+
+    // Combined PDF
+    const combinedPdf = await createCombinedPdf(singleImages);
+    const pdfBlob = combinedPdf.output('blob');
+    zip.file('combined.pdf', await blobToArrayBuffer(pdfBlob));
+
+    // Excel
+    const excelData = dataToGen.map(s => {
+      let dobFormatted = s.dob || '';
+      try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
+      return { name: s.name||'', fatherName: s.fatherName||'', motherName: s.motherName||'', address: s.address||'', class: s.class||'', dob: toOdiaDigits(dobFormatted), bloodGroup: s.bloodGroup||'', rollno: toOdiaDigits(s.roll||''), phone: toOdiaDigits(s.phone||''), photo: (s.newPhotoName||'') };
+    });
+    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] });
+    const wb = XLSX.utils.book_new();
+    const sheetName = schoolName.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Sheet1';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+    zip.file('student_data.xlsx', excelArray);
+
+    // Zip and Download
+    const zipBlob = await zip.generateAsync({ type:'blob' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(zipBlob); a.download = `${sheetName}_IDs.zip`; a.click();
+}
+
+
+/* ---------- Export Raw Data (Backup per school) ---------- */
+async function exportRawSchoolData(schoolName, btn) {
+    const dataToExport = groupedStudents[schoolName];
+    if(!dataToExport || dataToExport.length === 0) return;
+
+    const origText = btn.textContent;
+    btn.textContent = '⏳ Packing...'; btn.disabled = true;
+
+    try{
+        const zip = new JSZip(); 
+        dataToExport.forEach(s=>{ if(s.photoBase64){ const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); zip.file(`raw_data/${fname}`, s.photoBase64.split(',')[1], { base64:true }); }});
+        const excelData = dataToExport.map(s => { 
+            let dobFormatted = s.dob || ''; try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){} 
+            return { name:s.name||'', fatherName:s.fatherName||'', motherName:s.motherName||'', address:s.address||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', rollno:toOdiaDigits(s.roll||''), phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; 
+        });
+        const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] }); 
+        const wb = XLSX.utils.book_new(); 
+        let sheetName = schoolName.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31)||'Sheet1'; 
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' }); 
+        zip.file('student_data.xlsx', excelArray);
+        
+        const blob = await zip.generateAsync({ type:'blob' }); 
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${sheetName}_Raw_Backup.zip`; a.click();
+    } catch(err){ 
+        alert('Error creating zip: ' + (err.message || err)); 
+    } finally { 
+        btn.textContent = origText; btn.disabled = false; 
+    }
+}
+
+
+/* ---------- PDF & A4 Helpers ---------- */
 async function createA4Pages(singleImages){
   const pages = [];
   const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
@@ -566,7 +765,6 @@ async function createA4Pages(singleImages){
   return pages;
 }
 
-/* ---------- Create combined PDF: portrait pages (no borders) with tiled watermark ---------- */
 async function createCombinedPdf(singleImages){
   const mod = await ensureJsPDF(); const jsPDF = mod.jsPDF;
   const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] }); 
@@ -596,98 +794,9 @@ async function createCombinedPdf(singleImages){
   return pdf;
 }
 
-/* ---------- Utility: blob->arrayBuffer ---------- */
 function blobToArrayBuffer(b){ return new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.onerror = rej; fr.readAsArrayBuffer(b); }); }
 
-/* ---------- Main generate & zip ---------- */
-generateBtn.addEventListener('click', async ()=>{
-  if(!window.assets.template || !window.assets.font) return alert('Please upload template and font first.');
-  if(window.assets.aiModel === 'pending') return alert('AI is still initializing. Wait a moment.');
-  generateBtn.disabled = true; generatorStatus.textContent = 'Generating...';
-  try{
-    const val = schoolFilter.value; const dataToGen = (val==='all')? allStudents : allStudents.filter(s=>s.schoolName===val);
-    if(!dataToGen || dataToGen.length===0) return alert('No students to generate.');
-
-    const zip = new JSZip();
-    const rawFolder = zip.folder('raw_data');
-    const singlesFolder = zip.folder('single_cards');
-    const a4Folder = zip.folder('a4_pages');
-
-    const singleImages = [];
-    let counter = 0;
-    for(const st of dataToGen){
-      counter++; generatorStatus.textContent = `Generating ${counter} / ${dataToGen.length}...`;
-      if(st.photoBase64){ const fname = (st.newPhotoName || `${(st.name||'photo').replace(/\s+/g,'_')}_${st.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); rawFolder.file(fname, st.photoBase64.split(',')[1], { base64:true }); }
-      const blob = await generateCardImage(st);
-      const filename = `${(st.name||'student').replace(/\s+/g,'_')}_${st.roll||''}.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
-      singlesFolder.file(filename, await blobToArrayBuffer(blob));
-      const img = new Image(); img.src = URL.createObjectURL(blob); await new Promise((r,rej)=>{ img.onload=r; img.onerror=rej; });
-      singleImages.push({ id: st.id, name: filename, blob, img, student: st });
-    }
-
-    generatorStatus.textContent = 'Creating A4 pages (5×2)...';
-    const a4Pages = await createA4Pages(singleImages);
-    for(let i=0;i<a4Pages.length;i++){ a4Folder.file(`a4_landscape_page_${i+1}.png`, await blobToArrayBuffer(a4Pages[i])); }
-
-    generatorStatus.textContent = 'Creating combined PDF (watermark tiled)...';
-    const combinedPdf = await createCombinedPdf(singleImages);
-    const pdfBlob = combinedPdf.output('blob');
-    zip.file('combined.pdf', await blobToArrayBuffer(pdfBlob));
-
-    generatorStatus.textContent = 'Preparing Excel...';
-    const excelData = dataToGen.map(s => {
-      let dobFormatted = s.dob || '';
-      try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-      return { 
-          name: s.name||'', 
-          fatherName: s.fatherName||'', 
-          motherName: s.motherName||'', 
-          address: s.address||'', 
-          class: s.class||'', 
-          dob: toOdiaDigits(dobFormatted), 
-          bloodGroup: s.bloodGroup||'', 
-          rollno: toOdiaDigits(s.roll||''), 
-          phone: toOdiaDigits(s.phone||''), 
-          photo: (s.newPhotoName||'') 
-      };
-    });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] });
-    const wb = XLSX.utils.book_new();
-    const sheetName = (val==='all' ? 'All_Schools' : val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Sheet1';
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    zip.file('student_data.xlsx', excelArray);
-
-    generatorStatus.textContent = 'Zipping...';
-    const zipBlob = await zip.generateAsync({ type:'blob' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(zipBlob); a.download = `${sheetName}_Backup.zip`; a.click();
-    generatorStatus.textContent = 'Done — download started';
-  } catch(err){
-    console.error('Generation failed', err); alert('Generation failed: ' + (err.message || err));
-    generatorStatus.textContent = 'Error during generation';
-  } finally { generateBtn.disabled = false; }
-});
-
-/* ---------- Download raw ZIP (photos+excel) ---------- */
-downloadZipBtn.addEventListener('click', async ()=>{
-  if(!allStudents || allStudents.length===0) return alert('No data');
-  downloadZipBtn.disabled = true; downloadZipBtn.textContent = 'Generating Zip...';
-  try{
-    const val = schoolFilter.value; const dataToExport = (val==='all')? allStudents : allStudents.filter(s=>s.schoolName===val);
-    const zip = new JSZip(); dataToExport.forEach(s=>{ if(s.photoBase64){ const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); zip.file(`raw_data/${fname}`, s.photoBase64.split(',')[1], { base64:true }); }});
-    const excelData = dataToExport.map(s => { 
-        let dobFormatted = s.dob || ''; try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){} 
-        return { name:s.name||'', fatherName:s.fatherName||'', motherName:s.motherName||'', address:s.address||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', rollno:toOdiaDigits(s.roll||''), phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; 
-    });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] }); const wb = XLSX.utils.book_new(); let sheetName = (val==='all'?'All_Schools':val).replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31)||'Sheet1'; XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const excelArray = XLSX.write(wb, { bookType:'xlsx', type:'array' }); zip.file('student_data.xlsx', excelArray);
-    const blob = await zip.generateAsync({ type:'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${sheetName}_Backup.zip`; a.click();
-  } catch(err){ console.error(err); alert('Error creating zip: ' + (err.message || err)); } finally { downloadZipBtn.disabled=false; downloadZipBtn.textContent='Download Raw Backup (ZIP)'; }
-});
-
-/* ---------- Helpers ---------- */
-function updateDeleteButton(){ try{ deleteAllBtn.disabled = !(Array.isArray(window.allStudents) && window.allStudents.length>0); }catch(e){ deleteAllBtn.disabled=true; } }
-updateStatus();
+function updateGlobalDeleteButton(){ try{ deleteAllBtn.disabled = !(Array.isArray(window.allStudents) && window.allStudents.length>0); }catch(e){ deleteAllBtn.disabled=true; } }
 
 </script>
 </body>
