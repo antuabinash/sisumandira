@@ -156,13 +156,19 @@ const C = {
     detailX: 321,         // Universal X coordinate for the details text
     fatherY: 680,         // Started a little below 672
     motherY: 720,         // Exactly +40px difference
-    phoneY: 765,         // Exactly +40px difference
-    dobY: 807,           // Exactly +40px difference
-    addressY: 852,       // Exactly +40px difference
-    detailColor: '#02254b',
-    detailFont: 22,
+    phoneY: 760,         // Exactly +40px difference
+    dobY: 800,           // Exactly +40px difference
+    addressY: 840,       // Exactly +40px difference
+    detailColor: '#000000',
+    detailFont: 26,
 
-    // 5. EXTRA DATA (Class, Roll, Blood Group)
+    // 4. BLOOD GROUP
+    bloodX: 484,
+    bloodY: 476,
+    bloodColor: '#cc0000', // Dark Red for blood group
+    bloodFont: 28,
+
+    // 5. EXTRA DATA (Class, Roll)
     // If you want to print them somewhere on the card, set showExtra to true
     showExtra: false,
     extraX: 420,
@@ -497,6 +503,13 @@ async function generateCardImage(student){
   
   ctx.fillText(student.address || '-', dX, Math.round(C.addressY * scale));
 
+  // 4. Draw Blood Group
+  if (student.bloodGroup) {
+      ctx.fillStyle = C.bloodColor;
+      ctx.font = `bold ${Math.round(C.bloodFont * scale)}px OdiaFont, sans-serif`;
+      ctx.fillText(student.bloodGroup, Math.round(C.bloodX * scale), Math.round(C.bloodY * scale));
+  }
+
   // 5. Draw Extra Config Details (Class, Roll, etc if enabled)
   if (C.showExtra) {
       ctx.fillStyle = C.extraColor;
@@ -504,11 +517,6 @@ async function generateCardImage(student){
       let exY = C.extraY;
       ctx.fillText(`Class: ${student.class || '-'}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
       ctx.fillText(`Roll: ${toOdiaDigits(student.roll || '-')}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
-      
-      if (student.bloodGroup) {
-            ctx.fillStyle = '#cc0000';
-            ctx.fillText(`Blood: ${student.bloodGroup}`, Math.round(C.extraX * scale), Math.round(exY * scale));
-      }
   }
 
   return await new Promise(res => cardCanvas.toBlob(res,'image/png'));
