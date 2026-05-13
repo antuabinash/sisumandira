@@ -22,6 +22,7 @@
     button { width:100%; padding:12px; border:none; border-radius:4px; cursor:pointer; font-size:16px; margin-top:15px; }
     #openCameraBtn{background:#17a2b8;color:white}
     #addBtn{background:#007bff;color:white}
+    #cancelEditBtn{background:#6c757d;color:white;display:none;}
     #completeBtn{background:#ffc107;color:#333}
     #clearBtn{background:#dc3545;color:white}
     .student-list-item { display:flex; gap:12px; align-items:center; padding:10px; background:#fff; border-radius:6px; border:1px solid #eee; margin-bottom:8px; }
@@ -63,7 +64,7 @@
   </div>
 
   <div id="entryForm" class="card" style="display:none;">
-    <h3>Add Students</h3>
+    <h3 id="formTitle">Add Students</h3>
     
     <label>Full Name:</label><input id="name" placeholder="ପୂରା ନାମ" />
     <label>Father's Name:</label><input id="fatherName" placeholder="ପିତାଙ୍କ ନାମ" />
@@ -119,7 +120,10 @@
       <img id="photoPreview" src="" alt="Preview">
     </div>
 
-    <button id="addBtn">Add Student</button>
+    <div style="display:flex; gap:10px;">
+      <button id="addBtn">Add Student</button>
+      <button id="cancelEditBtn">Cancel Edit</button>
+    </div>
 
     <hr style="border:none;border-top:1px solid #eee;margin:25px 0 15px">
 
@@ -154,6 +158,7 @@
     const odiaMonths = ['ଜାନୁଆରୀ','ଫେବୃଆରୀ','ମାର୍ଚ୍ଚ','ଅପ୍ରେଲ','ମଇ','ଜୁନ୍','ଜୁଲାଇ','ଅଗଷ୍ଟ','ସେପ୍ଟେମ୍ବର','ଅକ୍ଟୋବର','ନଭେମ୍ବର','ଡିସେମ୍ବର'];
 
     let students = [], capturedPhotoFile = null, cameraStream = null, localDB = null, fbDB = null, currentSchoolName = '';
+    let editingStudentId = null;
 
     // DOM
     const entryForm = document.getElementById('entryForm');
@@ -173,6 +178,9 @@
     const studentListDiv = document.getElementById('studentList');
     const clearBtn = document.getElementById('clearBtn');
     const completeBtn = document.getElementById('completeBtn');
+    const addBtn = document.getElementById('addBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const formTitle = document.getElementById('formTitle');
 
     // firebase init
     try {
@@ -212,6 +220,7 @@
       entryForm.style.display = 'none';
       studentListDiv.innerHTML = '';
       students = [];
+      cancelEdit();
     });
     function setSchool(name) {
       currentSchoolName = name;
@@ -276,7 +285,8 @@
           <div class="progress-bar" id="progress-${student.id}"><div class="progress-bar-inner" id="progress-inner-${student.id}"></div></div>
         </div>
         <span class="sync-status ${statusClass}" id="sync-${student.id}" title="${student.missing ? 'Reload to re-upload to server' : (student.synced ? 'Synced' : 'Not uploaded yet')}">${statusIcon}</span>
-        <button class="deleteBtn" data-id="${student.id}" style="margin-left:10px;background:#dc3545;color:#fff;padding:6px 8px;border-radius:6px;border:none;">Delete</button>
+        <button class="editBtn" data-id="${student.id}" style="margin-left:10px;background:#ffc107;color:#333;padding:6px 12px;border-radius:6px;border:none;">Edit</button>
+        <button class="deleteBtn" data-id="${student.id}" style="margin-left:5px;background:#dc3545;color:#fff;padding:6px 8px;border-radius:6px;border:none;">Delete</button>
       `;
       studentListDiv.appendChild(div);
     }
@@ -348,7 +358,58 @@
       });
     }
 
-    document.getElementById('addBtn').addEventListener('click', async () => {
+    /* --- EDIT FUNCTIONALITY --- */
+    function loadStudentForEdit(id) {
+        const s = students.find(x => x.id === id);
+        if(!s) return;
+        
+        editingStudentId = id;
+        formTitle.textContent = "Edit Student Details";
+        
+        document.getElementById('name').value = s.name || '';
+        document.getElementById('fatherName').value = s.fatherName || '';
+        document.getElementById('motherName').value = s.motherName || '';
+        document.getElementById('address').value = s.address || '';
+        document.getElementById('class').value = s.class || '';
+        document.getElementById('roll').value = s.roll || '';
+        document.getElementById('dob').value = s.dob || '';
+        document.getElementById('phone').value = s.phone || '';
+        document.getElementById('bloodGroup').value = s.bloodGroup || '';
+
+        if (s.photoBase64) {
+            photoPreview.src = s.photoBase64;
+            photoPreview.style.display = 'block';
+        } else {
+            photoPreview.style.display = 'none';
+        }
+        
+        capturedPhotoFile = null;
+        photoInput.value = '';
+
+        addBtn.textContent = 'Update Student';
+        addBtn.style.background = '#28a745';
+        cancelEditBtn.style.display = 'block';
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+        editingStudentId = null;
+        formTitle.textContent = "Add Students";
+        addBtn.textContent = 'Add Student';
+        addBtn.style.background = '#007bff';
+        cancelEditBtn.style.display = 'none';
+        
+        ['name','fatherName','motherName','address','class','roll','dob','phone','bloodGroup'].forEach(id => document.getElementById(id).value='');
+        photoInput.value = ''; 
+        capturedPhotoFile = null; 
+        photoPreview.style.display = 'none';
+    }
+
+    cancelEditBtn.addEventListener('click', cancelEdit);
+
+    /* --- ADD OR UPDATE --- */
+    addBtn.addEventListener('click', async () => {
       try {
         if (!currentSchoolName) return alert('School name not set.');
         const name = document.getElementById('name').value.trim();
@@ -361,28 +422,51 @@
         const phone = document.getElementById('phone').value.trim();
         const blood = document.getElementById('bloodGroup').value;
 
-        const photo = capturedPhotoFile || (photoInput.files[0] || null);
         if (!name || !cls || !roll) return alert('Fill Name, Class, Roll.');
-        if (!photo) return alert('Upload Photo.');
 
-        const base64Image = await compressImage(photo);
-        const ext = (photo.name && photo.name.split('.').pop()) || 'jpg';
-        const newPhotoName = `${randomText(10)}.${ext}`;
+        const photo = capturedPhotoFile || (photoInput.files[0] || null);
+        const existingStudent = editingStudentId ? students.find(s => s.id === editingStudentId) : null;
+        
+        if (!editingStudentId && !photo) return alert('Upload Photo.');
+
+        let base64Image, newPhotoName, finalPhotoFile = null;
+
+        if (photo) {
+            // New photo uploaded
+            base64Image = await compressImage(photo);
+            const ext = (photo.name && photo.name.split('.').pop()) || 'jpg';
+            newPhotoName = `${randomText(10)}.${ext}`;
+            finalPhotoFile = photo instanceof File ? photo : null;
+        } else if (existingStudent) {
+            // Retain old photo during edit
+            base64Image = existingStudent.photoBase64;
+            newPhotoName = existingStudent.newPhotoName;
+            finalPhotoFile = existingStudent.photoFile;
+        }
+
+        const studentId = editingStudentId || Date.now();
 
         const student = {
-          id: Date.now(), schoolName: currentSchoolName,
+          id: studentId, schoolName: currentSchoolName,
           name, fatherName, motherName, address, class: cls, dob, dobOdia: convertToOdiaDate(dob), bloodGroup: blood, roll, phone,
-          photoFile: photo instanceof File ? photo : null, photoBase64: base64Image, newPhotoName, synced: false, missing: false
+          photoFile: finalPhotoFile, photoBase64: base64Image, newPhotoName, synced: false, missing: false
         };
 
         const tx = localDB.transaction(['students'],'readwrite');
-        tx.objectStore('students').add(student).onsuccess = () => {
-          students.push(student); renderStudent(student); uploadStudent(student);
-          // Reset
-          ['name','fatherName','motherName','address','class','roll','dob','phone','bloodGroup'].forEach(id => document.getElementById(id).value='');
-          photoInput.value=''; capturedPhotoFile=null; photoPreview.style.display='none'; renderStudentList();
+        tx.objectStore('students').put(student).onsuccess = () => {
+          
+          if (editingStudentId) {
+             const idx = students.findIndex(s => s.id === editingStudentId);
+             students[idx] = student;
+          } else {
+             students.push(student);
+          }
+          
+          cancelEdit(); // Reset form
+          renderStudentList();
+          uploadStudent(student); // force upload to firebase
         };
-      } catch(err){ alert('Add failed: '+(err.message||err)); }
+      } catch(err){ alert('Operation failed: '+(err.message||err)); }
     });
 
     function convertToOdiaDate(d) {
@@ -414,6 +498,12 @@
 
     studentListDiv.addEventListener('click', (e) => {
       const target = e.target;
+      
+      if (target.classList.contains('editBtn')) {
+        const id = Number(target.dataset.id);
+        loadStudentForEdit(id);
+      }
+      
       if (target.classList.contains('deleteBtn')) {
         const id = Number(target.dataset.id);
         showConfirm(`Delete local student ${id}? Also deletes from server.`, () => {
@@ -421,6 +511,7 @@
           tx.objectStore('students').delete(id).onsuccess = () => { students = students.filter(s => s.id !== id); renderStudentList(); if (fbDB) fbDB.collection('students').doc(id.toString()).delete().catch(()=>{}); };
         });
       }
+      
       if (target.classList.contains('sync-status') || target.closest('.sync-status')) {
         const span = target.classList.contains('sync-status') ? target : target.closest('.sync-status');
         const id = Number(span.id.replace('sync-','')); const student = students.find(s => s.id === id);
