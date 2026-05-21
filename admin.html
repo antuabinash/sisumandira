@@ -157,13 +157,14 @@ const C = {
     nameColor: '#cc0000', // Hex color (e.g. #cc0000 = Dark Red)
     nameFont: 35,         // Font size in pixels
 
-    // 3. DETAILS LIST (Father, Mother, Phone, DOB, Address)
+    // 3. DETAILS LIST (Class, Father, Mother, Phone, DOB, Address)
     detailX: 321,         // Universal X coordinate for the details text
-    fatherY: 680,         
-    motherY: 720,         
-    phoneY: 764,         
-    dobY: 806,           
-    addressY: 848,       
+    classY: 680,          // Class takes the top spot now
+    fatherY: 720,         // Everything else shifted down
+    motherY: 764,         
+    phoneY: 806,         
+    dobY: 848,           
+    addressY: 890,       
     detailColor: '#02254b',
     detailFont: 26,
 
@@ -572,6 +573,9 @@ async function generateCardImage(student){
   ctx.font = `${Math.round(C.detailFont * scale)}px OdiaFont, sans-serif`;
 
   const dX = Math.round(C.detailX * scale);
+
+  // Print Class first, then the rest of the details shifted down
+  ctx.fillText(student.class || '-', dX, Math.round(C.classY * scale));
   ctx.fillText(student.fatherName || '-', dX, Math.round(C.fatherY * scale));
   ctx.fillText(student.motherName || '-', dX, Math.round(C.motherY * scale));
   ctx.fillText(toOdiaDigits(student.phone || '-'), dX, Math.round(C.phoneY * scale));
