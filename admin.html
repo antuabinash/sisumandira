@@ -522,7 +522,7 @@ async function drawCard(s) {
         if(window.assets.aiModel === 'loaded' && faceDetector) {
             try {
                 const det = faceDetector.detect(photo);
-                if(det.detections.length > 0) {
+                if(det.detections && det.detections.length > 0) {
                     const b = det.detections[0].boundingBox;
                     let faceW = b.width;
                     let faceH = b.height;
