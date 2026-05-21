@@ -113,11 +113,10 @@
         <div style="flex:1"><label>Address</label><input id="editAddress" type="text" style="width:100%"></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
-        <div style="flex:1"><label>Roll</label><input id="editRoll" type="text" style="width:100%"></div>
         <div style="flex:1"><label>DOB</label><input id="editDob" type="date" style="width:100%"></div>
+        <div style="flex:1"><label>Phone</label><input id="editPhone" type="text" style="width:100%"></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
-        <div style="flex:1"><label>Phone</label><input id="editPhone" type="text" style="width:100%"></div>
         <div style="flex:1"><label>Blood Group</label>
           <select id="editBlood" style="width:100%;padding:8px"><option value="">(Optional)</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
         </div>
@@ -159,8 +158,8 @@ const C = {
 
     // 3. DETAILS LIST (Class, Father, Mother, Phone, DOB, Address)
     detailX: 321,         // Universal X coordinate for the details text
-    classY: 680,          // Class takes the top spot now
-    fatherY: 720,         // Everything else shifted down
+    classY: 680,          
+    fatherY: 720,         
     motherY: 764,         
     phoneY: 806,         
     dobY: 848,           
@@ -181,7 +180,6 @@ const C = {
     extraFont: 20
 };
 // =========================================================
-
 
 /* ---------- Helpers ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
@@ -297,7 +295,6 @@ function renderSchoolTiles() {
           <td><strong>${escapeHtml(s.name||'')}</strong></td>
           <td>${escapeHtml(s.fatherName||'-')}</td>
           <td>${escapeHtml(s.class||'')}</td>
-          <td>${escapeHtml(s.roll||'')}</td>
           <td>${escapeHtml(s.phone||'-')}</td>
           <td>
             <button class="generate-btn" data-id="${s.id}" style="background:#007bff; color:#fff; padding:6px 10px; font-size:12px; margin-right:4px;" title="Generate Single Card">Card</button>
@@ -322,7 +319,7 @@ function renderSchoolTiles() {
           <thead>
             <tr>
               <th class="checkbox-cell"><input type="checkbox" class="select-all-cb" data-school="${escapeHtml(schoolName)}" title="Select All"></th>
-              <th>Photo</th><th>Name</th><th>Father</th><th>Class</th><th>Roll</th><th>Phone</th><th>Actions</th>
+              <th>Photo</th><th>Name</th><th>Father</th><th>Class</th><th>Phone</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -436,7 +433,6 @@ function openEditModal(id){
     editMotherName.value=st.motherName||'';
     editAddress.value=st.address||'';
     editClass.value=st.class||''; 
-    editRoll.value=st.roll||''; 
     editDob.value=st.dob||''; 
     editPhone.value=st.phone||''; 
     editBlood.value=st.bloodGroup||''; 
@@ -451,7 +447,6 @@ saveEditBtn.addEventListener('click', async () => {
       motherName: editMotherName.value.trim(),
       address: editAddress.value.trim(),
       class: editClass.value.trim(), 
-      roll: editRoll.value.trim(), 
       dob: editDob.value||'', 
       phone: editPhone.value.trim(), 
       bloodGroup: editBlood.value||'' 
@@ -553,11 +548,9 @@ async function generateCardImage(student){
           let cx = bbox.originX + faceW / 2;
           let cy = bbox.originY + faceH / 2;
 
-          // Create a perfectly proportioned crop box based on the face
           let desiredCropH = faceH * 2.2; 
           let desiredCropW = desiredCropH * targetRatio;
 
-          // Prevent the crop box from exceeding actual image bounds
           if (desiredCropW > srcW || desiredCropH > srcH) {
               if (srcRatio > targetRatio) {
                   desiredCropH = srcH;
@@ -571,9 +564,8 @@ async function generateCardImage(student){
           sW = desiredCropW;
           sH = desiredCropH;
           sx = cx - sW / 2;
-          sy = cy - sH * 0.45; // Shift slightly upwards for the shoulders
+          sy = cy - sH * 0.45; // slight shift up for shoulders
 
-          // Lock bounds to edges without changing the ratio
           if (sx < 0) sx = 0;
           if (sy < 0) sy = 0;
           if (sx + sW > srcW) sx = srcW - sW;
@@ -581,12 +573,10 @@ async function generateCardImage(student){
 
           useFallbackCrop = false;
         }
-      } catch (e) {
-        console.warn('Face detection error:', e);
-      }
+      } catch (e) { console.warn('Face detection error:', e); }
     }
 
-    // Fallback: Perfect center crop (object-fit: cover) if AI misses
+    // Strict proportional fallback (object-fit: cover equivalent) ensures no stretching
     if (useFallbackCrop) {
         if (srcRatio > targetRatio) {
             sH = srcH;
@@ -616,8 +606,6 @@ async function generateCardImage(student){
   ctx.font = `${Math.round(C.detailFont * scale)}px OdiaFont, sans-serif`;
 
   const dX = Math.round(C.detailX * scale);
-
-  // Print Class first, then the rest of the details shifted down
   ctx.fillText(student.class || '-', dX, Math.round(C.classY * scale));
   ctx.fillText(student.fatherName || '-', dX, Math.round(C.fatherY * scale));
   ctx.fillText(student.motherName || '-', dX, Math.round(C.motherY * scale));
@@ -640,7 +628,6 @@ async function generateCardImage(student){
       ctx.font = `${Math.round(C.extraFont * scale)}px OdiaFont, sans-serif`;
       let exY = C.extraY;
       ctx.fillText(`Class: ${student.class || '-'}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
-      ctx.fillText(`Roll: ${toOdiaDigits(student.roll || '-')}`, Math.round(C.extraX * scale), Math.round(exY * scale)); exY += C.extraFont + 5;
   }
 
   return await new Promise(res => cardCanvas.toBlob(res,'image/png'));
@@ -660,7 +647,7 @@ async function generateSingleCard(btn) {
     const blob = await generateCardImage(student);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `${(student.name||'student').replace(/\s+/g,'_')}_${student.roll||''}_Card.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
+    a.download = `${(student.name||'student').replace(/\s+/g,'_')}_Card.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch(err) { alert('Generation failed: ' + (err.message || err)); } 
@@ -699,9 +686,9 @@ async function processAndDownloadZip(dataToGen, schoolName) {
     
     // Generate Cards
     for(const st of dataToGen){
-      if(st.photoBase64){ const fname = (st.newPhotoName || `${(st.name||'photo').replace(/\s+/g,'_')}_${st.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); rawFolder.file(fname, st.photoBase64.split(',')[1], { base64:true }); }
+      if(st.photoBase64){ const fname = (st.newPhotoName || `${(st.name||'photo').replace(/\s+/g,'_')}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); rawFolder.file(fname, st.photoBase64.split(',')[1], { base64:true }); }
       const blob = await generateCardImage(st);
-      const filename = `${(st.name||'student').replace(/\s+/g,'_')}_${st.roll||''}.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
+      const filename = `${(st.name||'student').replace(/\s+/g,'_')}.png`.replace(/[\\\/:\*\?"<>\|]/g,'_');
       singlesFolder.file(filename, await blobToArrayBuffer(blob));
       const img = new Image(); img.src = URL.createObjectURL(blob); await new Promise((r,rej)=>{ img.onload=r; img.onerror=rej; });
       singleImages.push({ id: st.id, name: filename, blob, img, student: st });
@@ -720,9 +707,9 @@ async function processAndDownloadZip(dataToGen, schoolName) {
     const excelData = dataToGen.map(s => {
       let dobFormatted = s.dob || '';
       try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){}
-      return { name: s.name||'', fatherName: s.fatherName||'', motherName: s.motherName||'', address: s.address||'', class: s.class||'', dob: toOdiaDigits(dobFormatted), bloodGroup: s.bloodGroup||'', rollno: toOdiaDigits(s.roll||''), phone: toOdiaDigits(s.phone||''), photo: (s.newPhotoName||'') };
+      return { name: s.name||'', fatherName: s.fatherName||'', motherName: s.motherName||'', address: s.address||'', class: s.class||'', dob: toOdiaDigits(dobFormatted), bloodGroup: s.bloodGroup||'', phone: toOdiaDigits(s.phone||''), photo: (s.newPhotoName||'') };
     });
-    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] });
+    const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','phone','photo'] });
     const wb = XLSX.utils.book_new();
     const sheetName = schoolName.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31) || 'Sheet1';
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -745,12 +732,12 @@ async function exportRawSchoolData(schoolName, btn) {
 
     try{
         const zip = new JSZip(); 
-        dataToExport.forEach(s=>{ if(s.photoBase64){ const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}_${s.roll||''}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); zip.file(`raw_data/${fname}`, s.photoBase64.split(',')[1], { base64:true }); }});
+        dataToExport.forEach(s=>{ if(s.photoBase64){ const fname = (s.newPhotoName || `${(s.name||'photo').replace(/\s+/g,'_')}.jpg`).replace(/[\\\/:\*\?"<>\|]/g,'_'); zip.file(`raw_data/${fname}`, s.photoBase64.split(',')[1], { base64:true }); }});
         const excelData = dataToExport.map(s => { 
             let dobFormatted = s.dob || ''; try{ const [y,m,d] = (s.dob||'').split('-'); if(y&&m&&d) dobFormatted = `${d}/${m}/${y}`; } catch(e){} 
-            return { name:s.name||'', fatherName:s.fatherName||'', motherName:s.motherName||'', address:s.address||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', rollno:toOdiaDigits(s.roll||''), phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; 
+            return { name:s.name||'', fatherName:s.fatherName||'', motherName:s.motherName||'', address:s.address||'', class:s.class||'', dob:toOdiaDigits(dobFormatted), bloodGroup:s.bloodGroup||'', phone:toOdiaDigits(s.phone||''), photo:(s.newPhotoName||'') }; 
         });
-        const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','rollno','phone','photo'] }); 
+        const ws = XLSX.utils.json_to_sheet(excelData, { header:['name','fatherName','motherName','address','class','dob','bloodGroup','phone','photo'] }); 
         const wb = XLSX.utils.book_new(); 
         let sheetName = schoolName.replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31)||'Sheet1'; 
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
