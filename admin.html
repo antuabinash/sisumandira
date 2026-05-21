@@ -535,28 +535,71 @@ async function generateCardImage(student){
   }
 
   let sx=0, sy=0, sW = photo.width || 1, sH = photo.height || 1;
-  if(photoLoaded && faceDetector && window.assets.aiModel === 'loaded'){
-    try{
-      const det = faceDetector.detect(photo);
-      if(det && det.detections && det.detections.length>0){
-        const bbox = det.detections[0].boundingBox;
-        let x1=bbox.originX, y1=bbox.originY, x2=bbox.originX + bbox.width, y2=bbox.originY + bbox.height;
-        const bw = x2-x1, bh = y2-y1;
-        const add_w = parseInt(bw * 0.6), add_h = parseInt(bh * 1.4);
-        const new_x1 = Math.max(0, x1 - add_w/2), new_y1 = Math.max(0, y1 - add_h/2);
-        const new_x2 = Math.min(photo.width, x2 + add_w/2), new_y2 = Math.min(photo.height, y2 + add_h/2);
-        sx = new_x1; sy = new_y1; sW = new_x2 - new_x1; sH = new_y2 - new_y1;
-      } else {
-        const targetRatio = pw / ph; const srcRatio = sW / sH;
-        if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
+  const targetRatio = pw / ph;
+
+  if (photoLoaded) {
+    let srcW = photo.width;
+    let srcH = photo.height;
+    let srcRatio = srcW / srcH;
+    let useFallbackCrop = true;
+
+    if (faceDetector && window.assets.aiModel === 'loaded') {
+      try {
+        const det = faceDetector.detect(photo);
+        if (det && det.detections && det.detections.length > 0) {
+          const bbox = det.detections[0].boundingBox;
+          let faceW = bbox.width;
+          let faceH = bbox.height;
+          let cx = bbox.originX + faceW / 2;
+          let cy = bbox.originY + faceH / 2;
+
+          // Create a perfectly proportioned crop box based on the face
+          let desiredCropH = faceH * 2.2; 
+          let desiredCropW = desiredCropH * targetRatio;
+
+          // Prevent the crop box from exceeding actual image bounds
+          if (desiredCropW > srcW || desiredCropH > srcH) {
+              if (srcRatio > targetRatio) {
+                  desiredCropH = srcH;
+                  desiredCropW = desiredCropH * targetRatio;
+              } else {
+                  desiredCropW = srcW;
+                  desiredCropH = desiredCropW / targetRatio;
+              }
+          }
+
+          sW = desiredCropW;
+          sH = desiredCropH;
+          sx = cx - sW / 2;
+          sy = cy - sH * 0.45; // Shift slightly upwards for the shoulders
+
+          // Lock bounds to edges without changing the ratio
+          if (sx < 0) sx = 0;
+          if (sy < 0) sy = 0;
+          if (sx + sW > srcW) sx = srcW - sW;
+          if (sy + sH > srcH) sy = srcH - sH;
+
+          useFallbackCrop = false;
+        }
+      } catch (e) {
+        console.warn('Face detection error:', e);
       }
-    }catch(e){
-      const targetRatio = pw / ph; const srcRatio = sW / sH;
-      if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
     }
-  } else if(photoLoaded){
-    const targetRatio = pw / ph; const srcRatio = sW / sH;
-    if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
+
+    // Fallback: Perfect center crop (object-fit: cover) if AI misses
+    if (useFallbackCrop) {
+        if (srcRatio > targetRatio) {
+            sH = srcH;
+            sW = sH * targetRatio;
+            sx = (srcW - sW) / 2;
+            sy = 0;
+        } else {
+            sW = srcW;
+            sH = sW / targetRatio;
+            sx = 0;
+            sy = (srcH - sH) / 2;
+        }
+    }
   }
 
   if(photoLoaded){ ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph); }
