@@ -71,28 +71,24 @@
     <label>Mother's Name:</label><input id="motherName" placeholder="ମାତାଙ୍କ ନାମ" />
     <label>Address:</label><input id="address" placeholder="ଠିକଣା" />
     
-    <div style="display:flex; gap:10px;">
-        <div style="flex:1;">
-            <label>Class:</label>
-            <select id="class" required>
-                <option value="">ଶ୍ରେଣୀ ବାଛନ୍ତୁ</option>
-                <option value="ଶିଶୁ ବାଟିକା">ଶିଶୁ ବାଟିକା</option>
-                <option value="ପ୍ରଥମ">ପ୍ରଥମ</option>
-                <option value="ଦ୍ଵିତୀୟ">ଦ୍ଵିତୀୟ</option>
-                <option value="ତୃତୀୟ">ତୃତୀୟ</option>
-                <option value="ଚତୁର୍ଥ">ଚତୁର୍ଥ</option>
-                <option value="ପଞ୍ଚମ">ପଞ୍ଚମ</option>
-                <option value="ଷଷ୍ଠ">ଷଷ୍ଠ</option>
-                <option value="ସପ୍ତମ">ସପ୍ତମ</option>
-                <option value="ଅଷ୍ଟମ">ଅଷ୍ଟମ</option>
-                <option value="ନବମ">ନବମ</option>
-                <option value="ଦଶମ">ଦଶମ</option>
-            </select>
-        </div>
-        <div style="flex:1;">
-            <label>Roll No:</label><input id="roll" placeholder="ରୋଲ୍ ନମ୍ବର" />
-        </div>
-    </div>
+    <label>Class:</label>
+    <select id="class" required>
+        <option value="">ଶ୍ରେଣୀ ବାଛନ୍ତୁ</option>
+        <option value="ଅରୁଣ">ଅରୁଣ</option>
+        <option value="ଉଦୟ">ଉଦୟ</option>
+        <option value="ପ୍ରଭାତ">ପ୍ରଭାତ</option>
+        <option value="ଶିଶୁ ବାଟିକା">ଶିଶୁ ବାଟିକା</option>
+        <option value="ପ୍ରଥମ">ପ୍ରଥମ</option>
+        <option value="ଦ୍ଵିତୀୟ">ଦ୍ଵିତୀୟ</option>
+        <option value="ତୃତୀୟ">ତୃତୀୟ</option>
+        <option value="ଚତୁର୍ଥ">ଚତୁର୍ଥ</option>
+        <option value="ପଞ୍ଚମ">ପଞ୍ଚମ</option>
+        <option value="ଷଷ୍ଠ">ଷଷ୍ଠ</option>
+        <option value="ସପ୍ତମ">ସପ୍ତମ</option>
+        <option value="ଅଷ୍ଟମ">ଅଷ୍ଟମ</option>
+        <option value="ନବମ">ନବମ</option>
+        <option value="ଦଶମ">ଦଶମ</option>
+    </select>
 
     <div style="display:flex; gap:10px;">
         <div style="flex:1;">
@@ -280,7 +276,7 @@
       div.innerHTML = `
         <img src="${url}" class="list-preview-img" alt="photo">
         <div class="student-info">
-          <div><strong>${escapeHtml(student.name||'')}</strong> (Class: ${escapeHtml(student.class||'')}, Roll: ${escapeHtml(student.roll||'')})</div>
+          <div><strong>${escapeHtml(student.name||'')}</strong> (Class: ${escapeHtml(student.class||'')})</div>
           <div class="student-sub-details">DOB: ${escapeHtml(student.dobOdia||'N/A')} ${student.bloodGroup ? '| Blood: ' + escapeHtml(student.bloodGroup) : ''}</div>
           <div class="progress-bar" id="progress-${student.id}"><div class="progress-bar-inner" id="progress-inner-${student.id}"></div></div>
         </div>
@@ -371,7 +367,6 @@
         document.getElementById('motherName').value = s.motherName || '';
         document.getElementById('address').value = s.address || '';
         document.getElementById('class').value = s.class || '';
-        document.getElementById('roll').value = s.roll || '';
         document.getElementById('dob').value = s.dob || '';
         document.getElementById('phone').value = s.phone || '';
         document.getElementById('bloodGroup').value = s.bloodGroup || '';
@@ -400,7 +395,7 @@
         addBtn.style.background = '#007bff';
         cancelEditBtn.style.display = 'none';
         
-        ['name','fatherName','motherName','address','class','roll','dob','phone','bloodGroup'].forEach(id => document.getElementById(id).value='');
+        ['name','fatherName','motherName','address','class','dob','phone','bloodGroup'].forEach(id => document.getElementById(id).value='');
         photoInput.value = ''; 
         capturedPhotoFile = null; 
         photoPreview.style.display = 'none';
@@ -417,19 +412,16 @@
         const motherName = document.getElementById('motherName').value.trim();
         const address = document.getElementById('address').value.trim();
         const cls = document.getElementById('class').value.trim();
-        const roll = document.getElementById('roll').value.trim();
         const dob = document.getElementById('dob').value;
         const phone = document.getElementById('phone').value.trim();
         const blood = document.getElementById('bloodGroup').value;
 
-        if (!name || !cls || !roll) return alert('Fill Name, Class, Roll.');
+        if (!name || !cls) return alert('Fill Name and Class.');
 
         const photo = capturedPhotoFile || (photoInput.files[0] || null);
         const existingStudent = editingStudentId ? students.find(s => s.id === editingStudentId) : null;
-        
-        if (!editingStudentId && !photo) return alert('Upload Photo.');
 
-        let base64Image, newPhotoName, finalPhotoFile = null;
+        let base64Image = null, newPhotoName = '', finalPhotoFile = null;
 
         if (photo) {
             // New photo uploaded
@@ -439,16 +431,16 @@
             finalPhotoFile = photo instanceof File ? photo : null;
         } else if (existingStudent) {
             // Retain old photo during edit
-            base64Image = existingStudent.photoBase64;
-            newPhotoName = existingStudent.newPhotoName;
-            finalPhotoFile = existingStudent.photoFile;
+            base64Image = existingStudent.photoBase64 || null;
+            newPhotoName = existingStudent.newPhotoName || '';
+            finalPhotoFile = existingStudent.photoFile || null;
         }
 
         const studentId = editingStudentId || Date.now();
 
         const student = {
           id: studentId, schoolName: currentSchoolName,
-          name, fatherName, motherName, address, class: cls, dob, dobOdia: convertToOdiaDate(dob), bloodGroup: blood, roll, phone,
+          name, fatherName, motherName, address, class: cls, dob, dobOdia: convertToOdiaDate(dob), bloodGroup: blood, roll: '', phone,
           photoFile: finalPhotoFile, photoBase64: base64Image, newPhotoName, synced: false, missing: false
         };
 
