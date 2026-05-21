@@ -108,7 +108,7 @@
     
     <label>Phone No:</label><input id="phone" placeholder="ଦୂରଭାଷ" />
 
-    <label style="margin-top:15px;border-top:1px solid #eee;padding-top:15px;">Student Photo:</label>
+    <label style="margin-top:15px;border-top:1px solid #eee;padding-top:15px;">Student Photo (Optional):</label>
     <button id="openCameraBtn">Take a Picture</button>
     <div style="margin-top:8px;">
       <label style="font-weight:normal;font-size:14px;">...or Upload from Gallery</label>
@@ -458,13 +458,8 @@
           renderStudentList();
           uploadStudent(student); // force upload to firebase
         };
-      } catch(err){ alert('Operation failed: '+(err.message||err)); }
+      } catch(err){ alert('Operation failed: '+(err.message||err)); console.error(err); }
     });
-
-    function convertToOdiaDate(d) {
-      if (!d) return ''; try { const [y,m,day] = d.split('-'); return `${Array.from(day).map(x=>odiaDigits[x]||x).join('')} ${odiaMonths[Number(m)-1]||''} ${Array.from(y).map(x=>odiaDigits[x]||x).join('')}`; } catch(e){ return d; }
-    }
-    function randomText(l) { let r=''; const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; for(let i=0;i<l;i++) r+=c.charAt(Math.floor(Math.random()*c.length)); return r; }
 
     async function uploadStudent(student) {
       if (!fbDB) return; if (student.missing) return;
