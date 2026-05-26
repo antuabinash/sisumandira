@@ -7,7 +7,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- Firebase SDKs (Firestore Only) -->
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
@@ -130,7 +129,6 @@
     <button id="completeBtn" disabled>Download Local Backup (Excel/ZIP)</button>
   </div>
 
-  <!-- camera modal -->
   <div id="cameraModal">
     <button id="closeCameraBtn">&times;</button>
     <video id="cameraVideo" playsinline autoplay></video>
@@ -427,7 +425,8 @@
             // New photo uploaded
             base64Image = await compressImage(photo);
             const ext = (photo.name && photo.name.split('.').pop()) || 'jpg';
-            newPhotoName = `${randomText(10)}.${ext}`;
+            // FIX: Removed randomText to prevent the undefined error!
+            newPhotoName = `photo_${Date.now()}_${Math.floor(Math.random()*1000)}.${ext}`;
             finalPhotoFile = photo instanceof File ? photo : null;
         } else if (existingStudent) {
             // Retain old photo during edit
@@ -460,6 +459,10 @@
         };
       } catch(err){ alert('Operation failed: '+(err.message||err)); console.error(err); }
     });
+
+    function convertToOdiaDate(d) {
+      if (!d) return ''; try { const [y,m,day] = d.split('-'); return `${Array.from(day).map(x=>odiaDigits[x]||x).join('')} ${odiaMonths[Number(m)-1]||''} ${Array.from(y).map(x=>odiaDigits[x]||x).join('')}`; } catch(e){ return d; }
+    }
 
     async function uploadStudent(student) {
       if (!fbDB) return; if (student.missing) return;
